@@ -2,6 +2,8 @@ import Botao from "@/components/Botao";
 import { useState } from "react";
 import { Button, FlatList, Text, TextInput, View } from "react-native";
 import { nextId } from "../util/geral";
+import { router } from 'expo-router';
+
 
 type Contato = {
   id: number;
@@ -87,6 +89,22 @@ export default function Index() {
         style={{ margin: 80 }}
         textStyle={{ fontSize: 18 }}
       />
+      <Botao
+        title="Ir para Tela Inicial"
+        onPress={() => router.push('../telainicial')}
+        color="#00ff00"
+        textColor="#000000"
+        style={{ margin: 80 }}
+        textStyle={{ fontSize: 18 }}
+      />
+      {/*<Botao
+        title="Ir para Tela Inicial 2"
+        onPress={() => router.push('../telainicial2')}
+        color="#ff0000"
+        textColor="#ffffff"
+        style={{ margin: 80 }}
+        textStyle={{ fontSize: 18 }}
+      />*/}
     </View>
   );
 }
