@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
 // Importando seu componente que criamos antes
 import Botao from '../components/Botao';
 
@@ -10,7 +10,7 @@ export default function App() {
 
   const confirmar = () => {
     Alert.alert('Bem-vindo!', `O seu salário é de R$ ${salario}, seu cadastro foi concluído.`);
-    router.push('/telainicial2');
+    router.replace('/(tabs)');
   };
   
 

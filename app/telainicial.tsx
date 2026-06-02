@@ -1,6 +1,6 @@
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useRouter } from 'expo-router';
 // Importando seu componente que criamos antes
 import Botao from '../components/Botao';
 
@@ -38,7 +38,7 @@ export default function App() {
         {/* Usando o seu componente de Botão personalizado */}
         <Botao 
           title="Continuar -->" 
-          onPress={() => router.push('../telainicial2')} 
+          onPress={() => router.push('/telainicial2')} 
           color="#7DC1A8" 
         />
 
@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     backgroundColor: '#fff',
-    padding: 30,
+    padding: 30, 
     borderRadius: 24, // Bordas mais arredondadas são tendência
     // Sombra mais suave e espalhada (Soft Shadow)
     elevation: 12,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   footerText: {
     marginTop: 25,
     fontSize: 12,
-   color: '#F7FFF7',      // Mesma cor off-white do título
+   color: '#F7FFF7',      // Mesma cor do título
   opacity: 0.7,
     textAlign: 'center',
     textTransform: 'uppercase',
