@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { useFinance, useAuth } from '../_layout';
 import { ChevronRight, LogOut, Bell, FileText, Target, Shield, HelpCircle } from 'lucide-react-native';
 
@@ -7,6 +8,7 @@ export default function Perfil() {
   const { totalReceitas, totalDespesas } = useFinance();
   const { usuario, logout } = useAuth();
   const [notificacoes, setNotificacoes] = useState(true);
+  const router = useRouter();
 
   return (
     <ScrollView style={styles.container}>
@@ -79,7 +81,10 @@ export default function Perfil() {
       <Text style={styles.versao}>⭐ EduFinance v1.0</Text>
       <Text style={styles.subVersao}>Feito para jovens que querem organizar as finanças</Text>
 
-      <TouchableOpacity style={styles.btnSair} onPress={logout}>
+      <TouchableOpacity style={styles.btnSair} onPress={() => {
+        logout();
+        router.replace('/telalogin');
+      }}>
         <LogOut size={18} color="#F44336" />
         <Text style={styles.btnSairTexto}>Sair da Conta</Text>
       </TouchableOpacity>

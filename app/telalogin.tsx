@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Alert, Image, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from './_layout';
 import Botao from '../components/Botao';
 
 export default function App() {
   const [gmail, setGmail] = useState('');
   const [senha, setSenha] = useState('');
+  const { setUsuario } = useAuth();
   const [nome, setNome] = useState(''); // Estado para o nome no cadastro
   const [aba, setAba] = useState<'entrar' | 'criar'>('entrar');
   const router = useRouter();
@@ -17,17 +19,30 @@ export default function App() {
   };*/}
 
   const confirmar = () => {
-  // Validação simples
   if (!gmail || !senha) {
     Alert.alert("Erro", "Preencha os campos!");
     return;
   }
 
   if (aba === 'entrar') {
-    // Usuário logou -> Vai para a tela principal
-    router.replace('/'); 
+    setUsuario({
+      nome: gmail.split('@')[0], // usa a parte antes do @ como nome
+      email: gmail,
+      rendaMensal: 0,
+      plano: 'free',
+    });
+    router.replace('/');
   } else {
-    // Usuário criou conta -> Vai para uma tela de tutorial ou perfil
+    if (!nome) {
+      Alert.alert("Erro", "Preencha o nome!");
+      return;
+    }
+    setUsuario({
+      nome,
+      email: gmail,
+      rendaMensal: 0,
+      plano: 'free',
+    });
     router.replace('/telainicial');
   }
 };
