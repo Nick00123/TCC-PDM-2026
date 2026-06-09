@@ -33,12 +33,7 @@ export const useFinance = () => useContext(FinanceContext);
 
 export default function RootLayout() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [transacoes, setTransacoes] = useState<Transacao[]>([
-    { id: '1', descricao: 'Aluguel', categoria: 'Moradia', valor: 1500, data: '2026-05-01', tipo: 'despesa', icone: '🏠' },
-    { id: '2', descricao: 'Mercado', categoria: 'Alimentação', valor: 800, data: '2026-05-05', tipo: 'despesa', icone: '🛒' },
-    { id: '3', descricao: 'Uber', categoria: 'Transporte', valor: 200, data: '2026-05-10', tipo: 'despesa', icone: '🚗' },
-    { id: '4', descricao: 'Salário', categoria: 'Receita', valor: 3000, data: '2026-05-01', tipo: 'receita', icone: '💰' },
-  ]);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
 
   const logout = () => setUsuario(null);

@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
-import { useFinance, useAuth } from '../_layout';
-import { ChevronRight, LogOut, Bell, FileText, Target, Shield, HelpCircle } from 'lucide-react-native';
+import { Bell, ChevronRight, FileText, HelpCircle, LogOut, Shield, Target } from 'lucide-react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { useAuth, useFinance } from '../_layout';
 
 export default function Perfil() {
   const { totalReceitas, totalDespesas } = useFinance();
@@ -59,12 +59,17 @@ export default function Perfil() {
         </View>
 
         {[
-          { icon: <FileText size={20} color="#1A9E75" />, titulo: 'Relatórios', sub: 'Ver histórico completo' },
-          { icon: <Target size={20} color="#1A9E75" />, titulo: 'Metas de economia', sub: 'Gerenciar seus objetivos' },
+          { icon: <FileText size={20} color="#1A9E75" />, titulo: 'Relatórios', sub: 'Ver histórico completo', rota: '/relatorios' },
+          { icon: <Target size={20} color="#1A9E75" />, titulo: 'Metas de economia', sub: 'Gerenciar seus objetivos', rota: '/metas' },
           { icon: <Shield size={20} color="#1A9E75" />, titulo: 'Privacidade', sub: 'Dados e segurança' },
           { icon: <HelpCircle size={20} color="#1A9E75" />, titulo: 'Ajuda & Suporte', sub: 'FAQ e contato' },
         ].map((item, i) => (
-          <TouchableOpacity key={i} style={styles.itemConfig}>
+          <TouchableOpacity
+            key={i}
+            style={styles.itemConfig}
+            onPress={() => item.rota && router.push(item.rota as any)}
+            disabled={!item.rota}
+          >
             <View style={styles.itemEsquerda}>
               {item.icon}
               <View>
