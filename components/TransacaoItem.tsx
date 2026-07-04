@@ -1,11 +1,12 @@
-import { View, Text, StyleSheet } from 'react-native';
+import type { ReactNode } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 
 type Props = {
-  icone: string;
+  icone?: string | ReactNode;
   descricao: string;
   categoria: string;
   valor: number;
-  tipo: 'receita' | 'despesa'; // ← adiciona isso
+  tipo: 'receita' | 'despesa';
 }
 
 export default function TransacaoItem({ icone, descricao, categoria, valor, tipo }: Props) {

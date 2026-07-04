@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { CreditCard, DollarSign, Plus, X } from 'lucide-react-native';
 import { useState } from 'react';
-import { useFinance, Transacao } from '../_layout';
-import { Plus, X } from 'lucide-react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Transacao, useFinance } from '../_layout';
 
 type Filtro = 'todos' | 'receitas' | 'despesas';
 type TipoModal = 'receita' | 'despesa' | null;
@@ -60,7 +60,9 @@ export default function Transacoes() {
       valor: parseFloat(valor.replace(',', '.')),
       data,
       tipo: modalTipo,
-      icone: modalTipo === 'receita' ? '💰' : '💸',
+      icone: modalTipo === 'receita'
+        ? <DollarSign size={28} color="#1A9E75" />
+        : <CreditCard size={28} color="#F44336" />,
     });
     limparForm();
   };
@@ -117,7 +119,9 @@ export default function Transacoes() {
             <Text style={styles.dataLabel}>{formatarData(data)}</Text>
             {items.map((t: Transacao) => (
               <View key={t.id} style={styles.item}>
-                <Text style={styles.icone}>{t.icone}</Text>
+                <View style={styles.iconeWrap}>
+                  {typeof t.icone === 'string' ? <Text style={styles.iconeText}>{t.icone}</Text> : t.icone}
+                </View>
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemDesc}>{t.descricao}</Text>
                   <Text style={styles.itemCat}>{t.categoria}</Text>
@@ -139,7 +143,7 @@ export default function Transacoes() {
             {/* Título do modal */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>
-                {modalTipo === 'receita' ? '📈 Nova Receita' : '📉 Nova Despesa'}
+                {modalTipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
               </Text>
               <TouchableOpacity onPress={limparForm}>
                 <X size={22} color="#666" />
@@ -264,6 +268,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   icone: { fontSize: 28, marginRight: 12 },
+  iconeWrap: { width: 36, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  iconeText: { fontSize: 24 },
   itemInfo: { flex: 1 },
   itemDesc: { fontSize: 15, fontWeight: '600' },
   itemCat: { fontSize: 12, color: '#888', marginTop: 2 },

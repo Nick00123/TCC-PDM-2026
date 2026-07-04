@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { useFinance, Meta } from '../_layout';
-import { Plus, Trash2, Check } from 'lucide-react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Meta, useFinance } from '../_layout';
 
 export default function Metas() {
   const { metas, adicionarMeta, depositar, excluirMeta } = useFinance();
@@ -80,7 +80,7 @@ export default function Metas() {
       {/* Concluídas */}
       {metasConcluidas.length > 0 && (
         <>
-          <Text style={styles.secaoTitulo}>CONCLUÍDAS 🎉</Text>
+          <Text style={styles.secaoTitulo}>CONCLUÍDAS</Text>
           {metasConcluidas.map((meta: Meta) => (
             <View key={meta.id} style={[styles.card, styles.cardConcluida]}>
               <View style={styles.cardHeader}>
@@ -98,7 +98,7 @@ export default function Metas() {
       {/* Vazio */}
       {metas.length === 0 && (
         <View style={styles.vazio}>
-          <Text style={styles.vazioIcone}>🎯</Text>
+          <Target size={48} color="#1A9E75" />
           <Text style={styles.vazioTitulo}>Nenhuma meta ainda</Text>
           <Text style={styles.vazioSubtitulo}>Crie sua primeira meta e comece a economizar!</Text>
         </View>

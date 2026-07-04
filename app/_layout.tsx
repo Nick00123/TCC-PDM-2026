@@ -5,7 +5,7 @@ export type Usuario = {
   nome: string;
   email: string;
   rendaMensal: number;
-  plano: 'free' | 'premium';
+  plano: 'free' | 'premium'; // ← adiciona isso
 };
 
 export type Transacao = {
@@ -15,7 +15,7 @@ export type Transacao = {
   valor: number;
   data: string;
   tipo: 'receita' | 'despesa';
-  icone: string;
+  icone: string | React.ReactNode;
 };
 
 export type Meta = {

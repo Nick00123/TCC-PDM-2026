@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Home, ArrowLeftRight, BarChart2, Lightbulb, User } from 'lucide-react-native';
+import { Home, ArrowLeftRight, BarChart2, Lightbulb, User, Target } from 'lucide-react-native';
 
 export default function TabsLayout() {
   return (
@@ -54,6 +54,13 @@ export default function TabsLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color }) => <User size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+         name="metas"
+         options={{
+          title: 'Metas',
+          tabBarIcon: ({ color }) => <Target size={22} color={color} />,
         }}
       />
     </Tabs>

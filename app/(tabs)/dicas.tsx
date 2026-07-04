@@ -1,6 +1,7 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
-import { useFinance, Transacao } from '../_layout';
-import { Play } from 'lucide-react-native';
+import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp } from 'lucide-react-native';
+import React from 'react';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Transacao, useFinance } from '../_layout';
 
 type Dica = {
   id: string;
@@ -8,7 +9,7 @@ type Dica = {
   descricao: string;
   categoria: 'Educação' | 'Investimento' | 'Comportamento' | 'Segurança' | 'Crédito';
   tempo: string;
-  icone: string;
+  icone: React.ReactNode;
 };
 
 const DICAS: Dica[] = [
@@ -18,7 +19,7 @@ const DICAS: Dica[] = [
     descricao: 'Necessidades 50%, desejos 30%, poupança/investimento 20%. Simples e eficaz para qualquer renda.',
     categoria: 'Educação',
     tempo: '2 min leitura',
-    icone: '📐',
+    icone: <Ruler size={28} color="#1A9E75" />,
   },
   {
     id: '2',
@@ -26,7 +27,7 @@ const DICAS: Dica[] = [
     descricao: 'R$ 200/mês investidos a 10% ao ano por 10 anos viram mais de R$ 38.000. Comece cedo!',
     categoria: 'Investimento',
     tempo: '3 min leitura',
-    icone: '📈',
+    icone: <TrendingUp size={28} color="#1A9E75" />,
   },
   {
     id: '3',
@@ -34,7 +35,7 @@ const DICAS: Dica[] = [
     descricao: 'Espere 24h antes de qualquer compra não planejada. Você vai se surpreender com quantas vontades passam!',
     categoria: 'Comportamento',
     tempo: '2 min leitura',
-    icone: '🧠',
+    icone: <Brain size={28} color="#6A1B9A" />,
   },
   {
     id: '4',
@@ -42,7 +43,7 @@ const DICAS: Dica[] = [
     descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
     categoria: 'Segurança',
     tempo: '3 min leitura',
-    icone: '🛡️',
+    icone: <Shield size={28} color="#1A9E75" />,
   },
   {
     id: '5',
@@ -50,7 +51,7 @@ const DICAS: Dica[] = [
     descricao: 'CDB, Tesouro Direto e fundos são boas opções para começar com pouco dinheiro.',
     categoria: 'Investimento',
     tempo: '4 min leitura',
-    icone: '💰',
+    icone: <DollarSign size={28} color="#1A9E75" />,
   },
   {
     id: '6',
@@ -58,7 +59,7 @@ const DICAS: Dica[] = [
     descricao: 'Nossas emoções afetam nossas decisões financeiras. Entender isso é o primeiro passo.',
     categoria: 'Comportamento',
     tempo: '5 min leitura',
-    icone: '🧩',
+    icone: <Puzzle size={28} color="#6A1B9A" />,
   },
 ];
 
@@ -83,10 +84,10 @@ const VIDEOS: Video[] = [
   {
     id: '2',
     titulo: 'Regra 50-30-20 na prática',
-    canal: 'Nathalia Arcuri',
-    duracao: '8 min',
+    canal: 'TCC-teste',
+    duracao: '7 min',
     categoria: 'Planejamento',
-    url: 'https://www.youtube.com/watch?v=example2',
+    url: 'https://youtu.be/aMgegLLLY9A',
   },
   {
     id: '3',
@@ -131,7 +132,7 @@ export default function Dicas() {
       return {
         titulo: 'Atenção aos seus gastos!',
         descricao: 'Suas despesas estão maiores que suas receitas. Tente reduzir gastos não essenciais e crie um orçamento mensal.',
-        icone: '⚠️',
+        icone: <Target size={22} color="#fff" />,
       };
     }
 
@@ -152,7 +153,7 @@ export default function Dicas() {
         return {
           titulo: `Você gasta muito com ${nome}`,
           descricao: `${pct}% das suas despesas são com ${nome}. Tente diversificar seus gastos e verificar onde pode economizar.`,
-          icone: '💡',
+          icone: <Lightbulb size={22} color="#fff" />,
         };
       }
     }
@@ -162,14 +163,14 @@ export default function Dicas() {
       return {
         titulo: 'Você está economizando!',
         descricao: `Parabéns! Você economizou R$ ${economia.toFixed(2)} este mês. Que tal investir esse valor no Tesouro Direto?`,
-        icone: '🎯',
+        icone: <Target size={22} color="#fff" />,
       };
     }
 
     return {
       titulo: 'Fundo de emergência',
       descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
-      icone: '🛡️',
+      icone: <Shield size={22} color="#fff" />,
     };
   };
 
@@ -187,9 +188,10 @@ export default function Dicas() {
       {/* Dica personalizada */}
       <View style={styles.dicaDestaque}>
         <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
-        <Text style={styles.dicaDestaqueTitulo}>
-          {dicaPersonalizada.icone} {dicaPersonalizada.titulo}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <View style={styles.dicaIcone}>{dicaPersonalizada.icone}</View>
+          <Text style={styles.dicaDestaqueTitulo}>{dicaPersonalizada.titulo}</Text>
+        </View>
         <Text style={styles.dicaDestaqueTexto}>{dicaPersonalizada.descricao}</Text>
       </View>
 
@@ -198,7 +200,7 @@ export default function Dicas() {
 
       {DICAS.map(dica => (
         <View key={dica.id} style={styles.dicaCard}>
-          <Text style={styles.dicaIcone}>{dica.icone}</Text>
+          <View style={styles.dicaIcone}>{dica.icone}</View>
           <View style={styles.dicaInfo}>
             <View style={styles.dicaHeaderRow}>
               <Text style={styles.dicaTitulo}>{dica.titulo}</Text>
@@ -215,7 +217,7 @@ export default function Dicas() {
       ))}
 
       {/* Seção de vídeos */}
-<Text style={styles.secaoTitulo}>📺 Aprenda com Vídeos</Text>
+    <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
 
 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
   {VIDEOS.map(video => (
@@ -323,7 +325,7 @@ videoDuracao: { fontSize: 11, color: '#aaa', marginTop: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
   },
-  dicaIcone: { fontSize: 32, marginRight: 12 },
+  dicaIcone: { width: 36, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   dicaInfo: { flex: 1 },
   dicaHeaderRow: {
     flexDirection: 'row',
