@@ -1,12 +1,13 @@
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
-import { TrendingUp, TrendingDown, BarChart2, Target } from 'lucide-react-native';
+import { ArrowDownLeft, ArrowUpRight, BarChart2, Target } from 'lucide-react-native';
 
 const acoes = [
-  { label: 'Receita',   icone: TrendingUp,   cor: '#e8f5e9', corIcone: '#1A9E75', rota: '/transacoes' },
-  { label: 'Despesa',   icone: TrendingDown,  cor: '#fce4ec', corIcone: '#F44336', rota: '/transacoes' },
-  { label: 'Relatório', icone: BarChart2,     cor: '#ede7f6', corIcone: '#7B1FA2', rota: '/relatorios' },
-  { label: 'Metas',     icone: Target,        cor: '#fff8e1', corIcone: '#F57F17', rota: '/metas' },
+  { label: 'Receita',   icone: ArrowDownLeft, cor: '#E6F4EA', corIcone: '#1A9E75', rota: '/transacoes' },
+  { label: 'Despesa',   icone: ArrowUpRight,  cor: '#FCE8E6', corIcone: '#E53935', rota: '/transacoes' },
+  { label: 'Relatório', icone: BarChart2,     cor: '#F3E8FF', corIcone: '#8E24AA', rota: '/relatorios' },
+  { label: 'Metas',     icone: Target,        cor: '#FEF7E0', corIcone: '#F57F17', rota: '/metas' },
 ];
 
 export default function AcoesRapidas() {
@@ -17,10 +18,16 @@ export default function AcoesRapidas() {
         return (
           <TouchableOpacity
             key={acao.label}
-            style={[styles.botao, { backgroundColor: acao.cor }]}
+            style={styles.item}
             onPress={() => router.push(acao.rota as any)}
+            activeOpacity={0.7}
           >
-            <Icone size={24} color={acao.corIcone} />
+            {/* Quadrado Colorido do Ícone */}
+            <View style={[styles.boxIcone, { backgroundColor: acao.cor }]}>
+              <Icone size={22} color={acao.corIcone} />
+            </View>
+
+            {/* Texto fora da caixinha */}
             <Text style={styles.label}>{acao.label}</Text>
           </TouchableOpacity>
         );
@@ -35,18 +42,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    padding: 16,
-  },
-  botao: {
-    flex: 1,
-    marginHorizontal: 8,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 8,
+  },
+  item: {
     alignItems: 'center',
-    gap: 6,
+    flex: 1,
+  },
+  boxIcone: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   label: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '500',
+    color: '#666666',
+    textAlign: 'center',
   },
 });

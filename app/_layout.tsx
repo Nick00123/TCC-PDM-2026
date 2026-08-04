@@ -5,7 +5,7 @@ export type Usuario = {
   nome: string;
   email: string;
   rendaMensal: number;
-  plano: 'free' | 'premium'; // ← adiciona isso
+  plano: 'free' | 'premium';
 };
 
 export type Transacao = {
@@ -41,6 +41,10 @@ export default function RootLayout() {
   const adicionarTransacao = (t: Omit<Transacao, 'id'>) =>
     setTransacoes(prev => [...prev, { ...t, id: Date.now().toString() }]);
 
+  // 🔴 ADICIONADO: Função para remover transação por ID
+  const removerTransacao = (id: string) =>
+    setTransacoes(prev => prev.filter(t => t.id !== id));
+
   const adicionarMeta = (m: Omit<Meta, 'id'>) =>
     setMetas(prev => [...prev, { ...m, id: Date.now().toString() }]);
 
@@ -64,8 +68,8 @@ export default function RootLayout() {
     <AuthContext.Provider value={{ usuario, setUsuario, logout }}>
       <FinanceContext.Provider value={{
         transacoes, metas,
-        adicionarTransacao, adicionarMeta,
-        depositar, excluirMeta,
+        adicionarTransacao, removerTransacao, // 🔴 Passado aqui pro Provider!
+        adicionarMeta, depositar, excluirMeta,
         saldoTotal, totalReceitas, totalDespesas,
       }}>
         <Stack screenOptions={{ headerShown: false }}>

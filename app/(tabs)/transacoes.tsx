@@ -1,5 +1,5 @@
-import { CreditCard, DollarSign, Plus, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { CreditCard, DollarSign, Filter, Plus, Trash2, X } from 'lucide-react-native';
+import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Transacao, useFinance } from '../_layout';
 
@@ -9,24 +9,48 @@ type TipoModal = 'receita' | 'despesa' | null;
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
 
-const formatarData = (data: string) => {
-  const meses = ['janeiro','fevereiro','março','abril','maio','junho',
-                  'julho','agosto','setembro','outubro','novembro','dezembro'];
-  const [mes, dia] = data.split('-');
-  return `${dia} de ${meses[parseInt(mes) - 1]}`;
+const formatarData = (dataStr: string) => {
+  if (!dataStr) return '';
+  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
+                 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const partes = dataStr.split('-');
+  if (partes.length < 3) return dataStr;
+  
+  const dia = partes[2];
+  const mesIndex = parseInt(partes[1], 10) - 1;
+  return `${dia} de ${meses[mesIndex] || ''}`;
+};
+
+// Cores de fundo para os ícones por categoria (estilo Base44)
+const getCorCategoria = (categoria: string, tipo: 'receita' | 'despesa') => {
+  if (tipo === 'receita') return '#DCFCE7'; // Verde claro
+  switch (categoria.toLowerCase()) {
+    case 'transporte': return '#E0F2FE'; // Azul claro
+    case 'alimentação': return '#DCFCE7'; // Verde pastel
+    case 'assinaturas': return '#E0E7FF'; // Roxo/Azul
+    default: return '#F1F5F9'; // Cinza neutro
+  }
 };
 
 export default function Transacoes() {
-  const { transacoes, adicionarTransacao } = useFinance();
+  const { transacoes, adicionarTransacao, removerTransacao } = useFinance();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busca, setBusca] = useState('');
   const [modalTipo, setModalTipo] = useState<TipoModal>(null);
 
-  // Estados do formulário
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
   const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+
+  const normalizarData = (dataStr: string) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) return dataStr;
+    const ptBr = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataStr);
+    if (ptBr) return `${ptBr[3]}-${ptBr[2]}-${ptBr[1]}`;
+    const dash = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dataStr);
+    if (dash) return `${dash[3]}-${dash[2]}-${dash[1]}`;
+    return dataStr;
+  };
 
   const transacoesFiltradas = transacoes
     .filter((t: Transacao) => {
@@ -38,10 +62,41 @@ export default function Transacoes() {
       t.descricao.toLowerCase().includes(busca.toLowerCase())
     );
 
-  const grupos: { [data: string]: Transacao[] } = {};
+  const saldoFiltrado = transacoesFiltradas.reduce((acc: number, t: { tipo: string; valor: number; }) => {
+    return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
+  }, 0);
+
+  const totalReceitasFiltradas = transacoesFiltradas
+    .filter((t: Transacao) => t.tipo === 'receita')
+    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+
+  const totalDespesasFiltradas = transacoesFiltradas
+    .filter((t: Transacao) => t.tipo === 'despesa')
+    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+
+  const headerTitle = filtro === 'receitas' ? 'Receitas' : filtro === 'despesas' ? 'Despesas' : 'Transações';
+  const headerValue = filtro === 'receitas'
+    ? totalReceitasFiltradas
+    : filtro === 'despesas'
+    ? totalDespesasFiltradas
+    : saldoFiltrado;
+  const headerColor = filtro === 'receitas' ? '#0D9488' : filtro === 'despesas' ? '#E11D48' : (saldoFiltrado >= 0 ? '#0D9488' : '#E11D48');
+  const headerDisplay = filtro === 'despesas'
+    ? `-R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : filtro === 'receitas'
+    ? `+R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : headerValue >= 0
+    ? `+R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : `-R$ ${Math.abs(headerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+  const grupos: { [data: string]: { itens: Transacao[]; totalDia: number } } = {};
+  
   transacoesFiltradas.forEach((t: Transacao) => {
-    if (!grupos[t.data]) grupos[t.data] = [];
-    grupos[t.data].push(t);
+    if (!grupos[t.data]) {
+      grupos[t.data] = { itens: [], totalDia: 0 };
+    }
+    grupos[t.data].itens.push(t);
+    grupos[t.data].totalDia += t.tipo === 'receita' ? t.valor : -t.valor;
   });
 
   const limparForm = () => {
@@ -54,16 +109,22 @@ export default function Transacoes() {
 
   const salvar = () => {
     if (!valor || !descricao || !categoria || !modalTipo) return;
+
+    const dataFormatada = normalizarData(data);
+    const dataObj = new Date(dataFormatada);
+    if (isNaN(dataObj.getTime())) return;
+    
     adicionarTransacao({
       descricao,
       categoria,
       valor: parseFloat(valor.replace(',', '.')),
-      data,
+      data: dataFormatada,
       tipo: modalTipo,
       icone: modalTipo === 'receita'
-        ? <DollarSign size={28} color="#1A9E75" />
-        : <CreditCard size={28} color="#F44336" />,
+        ? <DollarSign size={20} color="#0D9488" />
+        : <CreditCard size={20} color="#E11D48" />,
     });
+
     limparForm();
   };
 
@@ -71,18 +132,24 @@ export default function Transacoes() {
 
   return (
     <View style={styles.container}>
-
       {/* Cabeçalho */}
       <View style={styles.header}>
-        <Text style={styles.titulo}>Transações</Text>
+        <View>
+          <Text style={styles.titulo}>{headerTitle}</Text>
+          <Text style={styles.saldoFiltrado}>
+            <Text style={{ color: headerColor, fontWeight: 'bold' }}>{headerDisplay}</Text>
+          </Text>
+        </View>
+
         <View style={styles.headerBotoes}>
           <TouchableOpacity style={styles.btnReceita} onPress={() => setModalTipo('receita')}>
             <Plus size={14} color="#fff" />
-            <Text style={styles.btnTexto}>Receita</Text>
+            <Text style={styles.btnTextoReceita}>Receita</Text>
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.btnDespesa} onPress={() => setModalTipo('despesa')}>
-            <Plus size={14} color="#fff" />
-            <Text style={styles.btnTexto}>Despesa</Text>
+            <Plus size={14} color="#E11D48" />
+            <Text style={styles.btnTextoDespesa}>Despesa</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -98,49 +165,72 @@ export default function Transacoes() {
       </View>
 
       {/* Filtros */}
-      <View style={styles.filtros}>
-        {(['todos', 'receitas', 'despesas'] as Filtro[]).map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filtroBotao, filtro === f && styles.filtroAtivo]}
-            onPress={() => setFiltro(f)}
-          >
-            <Text style={[styles.filtroTexto, filtro === f && styles.filtroTextoAtivo]}>
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.filtrosRow}>
+        <View style={styles.filtros}>
+          {(['todos', 'receitas', 'despesas'] as Filtro[]).map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filtroBotao, filtro === f && styles.filtroAtivo]}
+              onPress={() => setFiltro(f)}
+            >
+              <Text style={[styles.filtroTexto, filtro === f && styles.filtroTextoAtivo]}>
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.contadorFiltro}>
+          <Filter size={14} color="#94A3B8" />
+          <Text style={styles.contadorTexto}>{transacoesFiltradas.length}</Text>
+        </View>
       </View>
 
       {/* Lista */}
-      <ScrollView>
-        {Object.entries(grupos).map(([data, items]) => (
-          <View key={data}>
-            <Text style={styles.dataLabel}>{formatarData(data)}</Text>
-            {items.map((t: Transacao) => (
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {Object.entries(grupos).map(([dataKey, grupo]) => (
+          <View key={dataKey}>
+            <View style={styles.dataHeader}>
+              <Text style={styles.dataLabel}>{formatarData(dataKey)}</Text>
+              <Text style={[styles.dataTotal, { color: grupo.totalDia >= 0 ? '#0D9488' : '#E11D48' }]}> 
+                  {grupo.totalDia >= 0
+                    ? `+R$ ${grupo.totalDia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : `-R$ ${Math.abs(grupo.totalDia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+                </Text>
+            </View>
+
+            {grupo.itens.map((t: Transacao) => (
               <View key={t.id} style={styles.item}>
-                <View style={styles.iconeWrap}>
+                <View style={[styles.iconeWrap, { backgroundColor: getCorCategoria(t.categoria, t.tipo) }]}>
                   {typeof t.icone === 'string' ? <Text style={styles.iconeText}>{t.icone}</Text> : t.icone}
                 </View>
+                
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemDesc}>{t.descricao}</Text>
                   <Text style={styles.itemCat}>{t.categoria}</Text>
                 </View>
-                <Text style={[styles.itemValor, { color: t.tipo === 'receita' ? '#1A9E75' : '#F44336' }]}>
-                  {t.tipo === 'receita' ? '+' : '-'}R$ {t.valor.toFixed(2)}
+
+                <Text style={[styles.itemValor, { color: t.tipo === 'receita' ? '#0D9488' : '#E11D48' }]}>
+                  {t.tipo === 'receita' ? '+' : '-'}R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </Text>
+
+                <TouchableOpacity 
+                  onPress={() => removerTransacao && removerTransacao(t.id)} 
+                  style={styles.btnLixeira}
+                >
+                  <Trash2 size={16} color="#94A3B8" />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
         ))}
       </ScrollView>
 
-      {/* Modal */}
+      {/* Modal de Adicionar */}
       <Modal visible={modalTipo !== null} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
 
-            {/* Título do modal */}
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>
                 {modalTipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
@@ -150,7 +240,6 @@ export default function Transacoes() {
               </TouchableOpacity>
             </View>
 
-            {/* Valor */}
             <Text style={styles.label}>Valor (R$)</Text>
             <TextInput
               style={styles.inputValor}
@@ -160,16 +249,14 @@ export default function Transacoes() {
               onChangeText={setValor}
             />
 
-            {/* Descrição */}
             <Text style={styles.label}>Descrição</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ex: Salário maio"
+              placeholder="Ex: Mercado"
               value={descricao}
               onChangeText={setDescricao}
             />
 
-            {/* Categorias */}
             <Text style={styles.label}>Categoria</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorias}>
               {categorias.map(c => (
@@ -185,9 +272,8 @@ export default function Transacoes() {
               ))}
             </ScrollView>
 
-            {/* Botão salvar */}
             <TouchableOpacity
-              style={[styles.btnSalvar, { backgroundColor: modalTipo === 'receita' ? '#1A9E75' : '#F44336' }]}
+              style={[styles.btnSalvar, { backgroundColor: modalTipo === 'receita' ? '#0D9488' : '#E11D48' }]}
               onPress={salvar}
             >
               <Text style={styles.btnSalvarTexto}>
@@ -204,76 +290,103 @@ export default function Transacoes() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  container: { flex: 1, backgroundColor: '#FAFAFA' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
     paddingTop: 50,
+    paddingBottom: 16,
     backgroundColor: '#fff',
   },
-  titulo: { fontSize: 22, fontWeight: 'bold' },
+  titulo: { fontSize: 22, fontWeight: 'bold', color: '#0F172A' },
+  saldoFiltrado: { fontSize: 13, color: '#64748B', marginTop: 4 },
   headerBotoes: { flexDirection: 'row', gap: 8 },
   btnReceita: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A9E75',
+    backgroundColor: '#0D9488',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
     gap: 4,
   },
   btnDespesa: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F44336',
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
     gap: 4,
   },
-  btnTexto: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  buscaContainer: { padding: 16, backgroundColor: '#fff' },
+  btnTextoReceita: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  btnTextoDespesa: { color: '#E11D48', fontSize: 13, fontWeight: '600' },
+  buscaContainer: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#fff' },
   busca: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     fontSize: 14,
   },
-  filtros: { flexDirection: 'row', padding: 16, gap: 8 },
+  filtrosRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  filtros: { flexDirection: 'row', gap: 8 },
   filtroBotao: {
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#F1F5F9',
   },
-  filtroAtivo: { backgroundColor: '#1A9E75' },
-  filtroTexto: { color: '#666', fontWeight: '600' },
+  filtroAtivo: { backgroundColor: '#0D9488' },
+  filtroTexto: { color: '#64748B', fontWeight: '600', fontSize: 13 },
   filtroTextoAtivo: { color: '#fff' },
-  dataLabel: {
-    fontSize: 13,
-    color: '#888',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    fontWeight: '600',
+  contadorFiltro: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  contadorTexto: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+  dataHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
+  dataLabel: { fontSize: 13, color: '#64748B', fontWeight: '600' },
+  dataTotal: { fontSize: 13, fontWeight: '600' },
   item: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 16,
-    marginHorizontal: 16,
+    padding: 14,
+    marginHorizontal: 20,
     marginBottom: 8,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
-  icone: { fontSize: 28, marginRight: 12 },
-  iconeWrap: { width: 36, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  iconeText: { fontSize: 24 },
+  iconeWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  iconeText: { fontSize: 20 },
   itemInfo: { flex: 1 },
-  itemDesc: { fontSize: 15, fontWeight: '600' },
-  itemCat: { fontSize: 12, color: '#888', marginTop: 2 },
-  itemValor: { fontSize: 15, fontWeight: 'bold' },
+  itemDesc: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+  itemCat: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  itemValor: { fontSize: 15, fontWeight: 'bold', marginRight: 12 },
+  btnLixeira: { padding: 4 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -293,18 +406,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalTitulo: { fontSize: 18, fontWeight: 'bold' },
-  label: { fontSize: 13, color: '#888', fontWeight: '600', marginBottom: 6 },
+  label: { fontSize: 13, color: '#64748B', fontWeight: '600', marginBottom: 6 },
   inputValor: {
     fontSize: 28,
     fontWeight: 'bold',
     textAlign: 'center',
     borderBottomWidth: 2,
-    borderBottomColor: '#1A9E75',
+    borderBottomColor: '#0D9488',
     marginBottom: 20,
     padding: 8,
   },
   input: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F1F5F9',
     borderRadius: 10,
     padding: 12,
     fontSize: 15,
@@ -315,11 +428,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#F1F5F9',
     marginRight: 8,
   },
-  categoriaChipAtivo: { backgroundColor: '#1A9E75' },
-  categoriaTexto: { color: '#666', fontWeight: '600' },
+  categoriaChipAtivo: { backgroundColor: '#0D9488' },
+  categoriaTexto: { color: '#64748B', fontWeight: '600' },
   categoriaTextoAtivo: { color: '#fff' },
   btnSalvar: {
     padding: 16,

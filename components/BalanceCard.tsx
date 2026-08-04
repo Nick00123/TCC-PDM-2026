@@ -1,29 +1,50 @@
+import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
+import { ArrowUpRight, ArrowDownLeft } from 'lucide-react-native';
 
-// Recebe saldo, receitas e despesas como props
 type Props = {
   saldo: number;
   receitas: number;
   despesas: number;
-}
+};
 
 export default function BalanceCard({ saldo, receitas, despesas }: Props) {
+  // Função auxiliar para formatar em moeda brasileira (R$)
+  const formatCurrency = (val: number) => {
+    return val.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   return (
     <View style={styles.card}>
+      {/* Saldo Total */}
       <Text style={styles.label}>Saldo Total</Text>
+      <Text style={styles.saldo}>R$ {formatCurrency(saldo)}</Text>
 
-      {/* Aqui aparece o valor real vindo das props */}
-      <Text style={styles.saldo}>R$ {saldo}</Text>
-
-      {/* Caixinhas lado a lado */}
+      {/* Mini-cards (Receitas e Despesas) */}
       <View style={styles.row}>
+        {/* Card Receitas */}
         <View style={styles.caixinha}>
-          <Text style={styles.caixinhaLabel}>↗ Receitas</Text>
-          <Text style={styles.caixinhaValor}>R$ {receitas}</Text>
+          <View style={styles.iconCircle}>
+            <ArrowUpRight color="#FFFFFF" size={18} />
+          </View>
+          <View style={styles.caixinhaTextos}>
+            <Text style={styles.caixinhaLabel}>Receitas</Text>
+            <Text style={styles.caixinhaValor}>R$ {formatCurrency(receitas)}</Text>
+          </View>
         </View>
+
+        {/* Card Despesas */}
         <View style={styles.caixinha}>
-          <Text style={styles.caixinhaLabel}>↙ Despesas</Text>
-          <Text style={styles.caixinhaValor}>R$ {despesas}</Text>
+          <View style={styles.iconCircle}>
+            <ArrowDownLeft color="#FFFFFF" size={18} />
+          </View>
+          <View style={styles.caixinhaTextos}>
+            <Text style={styles.caixinhaLabel}>Despesas</Text>
+            <Text style={styles.caixinhaValor}>R$ {formatCurrency(despesas)}</Text>
+          </View>
         </View>
       </View>
     </View>
@@ -31,45 +52,58 @@ export default function BalanceCard({ saldo, receitas, despesas }: Props) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        padding: 20,
-    },
-    card: { 
-  backgroundColor: '#1a9e75', // ← verde
-  padding: 20, // ← mais espaço
-  borderRadius: 20,           // ← mais arredondado
-},
-label: {
-  fontSize: 13,
-  color: 'rgba(255,255,255,0.85)', // ← branco semitransparente
-  marginBottom: 4,
-},
-saldo: {
-  fontSize: 32,
-  fontWeight: 'bold',
-  color: '#fff',             // ← branco
-  marginBottom: 20,
-},
-caixinha: {
-  flex: 1,                   // ← em vez de width: '48%'
-  backgroundColor: 'rgba(255,255,255,0.15)', // ← branco transparente
-  padding: 12,
-  borderRadius: 12,
-},
-caixinhaLabel: {
-  fontSize: 11,
-  color: 'rgba(255,255,255,0.8)', // ← branco
-  marginBottom: 4,
-},
-caixinhaValor: {
-  fontSize: 15,
-  fontWeight: '600',
-  color: '#fff',             // ← branco
-},
-row: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  gap: 12, // ← espaço entre as caixinhas (se suportado) ou use margin
-}
-
-    });
+  card: {
+    backgroundColor: '#26A69A', // Verde Teal idêntico ao modelo
+    padding: 20,
+    borderRadius: 24,
+    marginHorizontal: 16,
+    marginTop: 10,
+  },
+  label: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
+  },
+  saldo: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 4,
+    marginBottom: 20,
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  caixinha: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  caixinhaTextos: {
+    flexDirection: 'column',
+  },
+  caixinhaLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
+  },
+  caixinhaValor: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+});

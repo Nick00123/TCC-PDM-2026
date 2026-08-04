@@ -1,6 +1,6 @@
 import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp } from 'lucide-react-native';
 import React from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ImageBackground, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Transacao, useFinance } from '../_layout';
 
 type Dica = {
@@ -8,7 +8,6 @@ type Dica = {
   titulo: string;
   descricao: string;
   categoria: 'Educação' | 'Investimento' | 'Comportamento' | 'Segurança' | 'Crédito';
-  tempo: string;
   icone: React.ReactNode;
 };
 
@@ -18,7 +17,6 @@ const DICAS: Dica[] = [
     titulo: 'Regra 50-30-20',
     descricao: 'Necessidades 50%, desejos 30%, poupança/investimento 20%. Simples e eficaz para qualquer renda.',
     categoria: 'Educação',
-    tempo: '2 min leitura',
     icone: <Ruler size={28} color="#1A9E75" />,
   },
   {
@@ -26,7 +24,6 @@ const DICAS: Dica[] = [
     titulo: 'Juros compostos',
     descricao: 'R$ 200/mês investidos a 10% ao ano por 10 anos viram mais de R$ 38.000. Comece cedo!',
     categoria: 'Investimento',
-    tempo: '3 min leitura',
     icone: <TrendingUp size={28} color="#1A9E75" />,
   },
   {
@@ -34,7 +31,6 @@ const DICAS: Dica[] = [
     titulo: 'Compra por impulso',
     descricao: 'Espere 24h antes de qualquer compra não planejada. Você vai se surpreender com quantas vontades passam!',
     categoria: 'Comportamento',
-    tempo: '2 min leitura',
     icone: <Brain size={28} color="#6A1B9A" />,
   },
   {
@@ -42,7 +38,6 @@ const DICAS: Dica[] = [
     titulo: 'Fundo de emergência',
     descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
     categoria: 'Segurança',
-    tempo: '3 min leitura',
     icone: <Shield size={28} color="#1A9E75" />,
   },
   {
@@ -50,7 +45,6 @@ const DICAS: Dica[] = [
     titulo: 'Como investir R$100/mês',
     descricao: 'CDB, Tesouro Direto e fundos são boas opções para começar com pouco dinheiro.',
     categoria: 'Investimento',
-    tempo: '4 min leitura',
     icone: <DollarSign size={28} color="#1A9E75" />,
   },
   {
@@ -58,7 +52,6 @@ const DICAS: Dica[] = [
     titulo: 'Psicologia do dinheiro',
     descricao: 'Nossas emoções afetam nossas decisões financeiras. Entender isso é o primeiro passo.',
     categoria: 'Comportamento',
-    tempo: '5 min leitura',
     icone: <Puzzle size={28} color="#6A1B9A" />,
   },
 ];
@@ -70,20 +63,26 @@ type Video = {
   duracao: string;
   categoria: string;
   url: string;
+  thumbnail?: string;
+};
+
+const getYoutubeThumbnail = (url: string) => {
+  const match = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : undefined;
 };
 
 const VIDEOS: Video[] = [
   {
     id: '1',
-    titulo: 'Como montar um orçamento do zero',
-    canal: 'Me Poupe!',
-    duracao: '12 min',
+    titulo: 'COMO ORGANIZAR SUAS FINANÇAS E GUARDAR DINHEIRO | Planejamento financeiro FÁCIL',
+    canal: 'O Primo Rico',
+    duracao: '17 min',
     categoria: 'Orçamento',
-    url: 'https://www.youtube.com/watch?v=example1',
+    url: 'https://www.youtube.com/watch?v=in0XbfQEm2A',
   },
   {
     id: '2',
-    titulo: 'Regra 50-30-20 na prática',
+    titulo: 'EduFinance: Regra 50-30-20',
     canal: 'TCC-teste',
     duracao: '7 min',
     categoria: 'Planejamento',
@@ -91,19 +90,19 @@ const VIDEOS: Video[] = [
   },
   {
     id: '3',
-    titulo: 'Tesouro Direto para iniciantes',
+    titulo: 'Tesouro Direto para iniciantes: do Selic ao Renda+! Como investir?',
     canal: 'Me Poupe!',
-    duracao: '15 min',
+    duracao: '12 min',
     categoria: 'Investimento',
-    url: 'https://www.youtube.com/watch?v=example3',
+    url: 'https://www.youtube.com/watch?v=y2sBkIX72-g',
   },
   {
     id: '4',
-    titulo: 'Como sair das dívidas',
-    canal: 'Primo Rico',
-    duracao: '10 min',
+    titulo: 'Como sair das DIVIDAS! (com sacrifícios e dicas REAIS...)',
+    canal: 'O Primo Rico',
+    duracao: '13 min',
     categoria: 'Dívidas',
-    url: 'https://www.youtube.com/watch?v=example4',
+    url: 'https://www.youtube.com/watch?v=8zj0GJKTWwE',
   },
 ];
 
@@ -211,7 +210,7 @@ export default function Dicas() {
               </View>
             </View>
             <Text style={styles.dicaDescricao} numberOfLines={2}>{dica.descricao}</Text>
-            <Text style={styles.dicaTempo}>{dica.tempo}</Text>
+            {/* <Text style={styles.dicaTempo}>{dica.tempo}</Text> */}
           </View>
         </View>
       ))}
@@ -227,9 +226,16 @@ export default function Dicas() {
       onPress={() => Linking.openURL(video.url)}
     >
       {/* Thumbnail */}
-      <View style={styles.thumbnail}>
-        <Play size={28} color="#fff" fill="#fff" />
-      </View>
+      <ImageBackground
+        source={{ uri: video.thumbnail || getYoutubeThumbnail(video.url) }}
+        style={styles.thumbnail}
+        imageStyle={styles.thumbnailImage}
+        resizeMode="cover"
+      >
+        <View style={styles.playOverlay}>
+          <Play size={28} color="#fff" fill="#fff" />
+        </View>
+      </ImageBackground>
 
       {/* Info */}
       <View style={styles.videoInfo}>
@@ -304,8 +310,23 @@ videoCard: {
 thumbnail: {
   backgroundColor: '#1A9E75',
   height: 110,
+  width: '100%',
   justifyContent: 'center',
   alignItems: 'center',
+},
+thumbnailImage: {
+  width: '100%',
+  height: '100%',
+},
+playOverlay: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  backgroundColor: 'rgba(0,0,0,0.2)',
 },
 videoInfo: { padding: 12 },
 videoTitulo: { fontSize: 13, fontWeight: 'bold', marginVertical: 4 },

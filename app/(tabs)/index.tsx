@@ -1,14 +1,14 @@
-import { useFinance, Meta, Transacao } from '../_layout';
-import Cabecalho from '../../components/Cabecalho';
-import BalanceCard from '../../components/BalanceCard';
-import AcoesRapidas from '../../components/AcoesRapidas';
-import MetaCard from '../../components/MetaCard';
-import TransacaoItem from '../../components/TransacaoItem';
 import EvolucaoMensal from '@/components/EvolucaoMensal';
 import GastosPorCategoria from '@/components/GastosPorCategoria';
+import AcoesRapidas from '../../components/AcoesRapidas';
+import BalanceCard from '../../components/BalanceCard';
+import Cabecalho from '../../components/Cabecalho';
+import MetaCard from '../../components/MetaCard';
+import TransacaoItem from '../../components/TransacaoItem';
+import { Meta, Transacao, useFinance } from '../_layout';
 
 //import { useFinance } from '../_layout';
-import { ScrollView, StyleSheet, Text } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 
 export default function Home() {
@@ -21,7 +21,6 @@ export default function Home() {
       <AcoesRapidas />
       {metas.length > 0 && (
   <>
-    <Text style={styles.secaoTitulo}>Metas de Economia</Text>
     {metas.map((meta: Meta) => (
       <MetaCard key={meta.id} {...meta} />
     ))}
