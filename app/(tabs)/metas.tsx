@@ -2,6 +2,8 @@ import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Meta, useFinance } from '../_layout';
+import { supabase } from '../supabaseClient';
+import { useEffect } from 'react';
 
 export default function Metas() {
   const { metas, adicionarMeta, depositar, excluirMeta } = useFinance();
@@ -11,20 +13,50 @@ export default function Metas() {
   const [titulo, setTitulo] = useState('');
   const [total, setTotal] = useState('');
 
+  async function carregarMetas() {
+    const { data, error } = await supabase.from('Metas').select('*').order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar metas:', error.message);
+    } else {
+      // Atualiza o estado global com as metas carregadas
+      // Aqui você pode usar um contexto ou estado global para armazenar as metas
+    }
+  }
+
+  useEffect(() => {
+    carregarMetas();
+  }, []);
+
   const metasAndamento = metas.filter((m: Meta) => m.atual < m.total);
   const metasConcluidas = metas.filter((m: Meta) => m.atual >= m.total);
 
-  const salvar = () => {
+  const salvar = async () => {
     if (!titulo || !total) return;
+
+    const valorTotal = parseFloat(total.replace(',', '.'));
+    const { data, error } = await supabase.from('Metas').insert([{ 
+      titulo: titulo,
+      valor_objetivo: valorTotal,
+      valor_atual: 0, 
+    }
+  ]);
+
+    if (error) {
+      console.error('Erro ao salvar no supabase:', error.message);
+    }
+
     adicionarMeta({
       titulo,
       atual: 0,
-      total: parseFloat(total.replace(',', '.')),
+      total: valorTotal,
     });
+
     setTitulo('');
     setTotal('');
     setModalAberto(false);
   };
+
 
   return (
     <ScrollView style={styles.container}>
