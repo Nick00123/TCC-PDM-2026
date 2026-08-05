@@ -1,61 +1,66 @@
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { Meta, useFinance } from '../_layout';
-import { supabase } from '../supabaseClient';
-import { useEffect } from 'react';
 
 export default function Metas() {
-  const { metas, adicionarMeta, depositar, excluirMeta } = useFinance();
+  const {
+  metas,
+  adicionarMeta,
+  depositar,
+  excluirMeta,
+  carregandoMetas,
+} = useFinance();
   const [metaSelecionada, setMetaSelecionada] = useState<string | null>(null);
   const [valorDeposito, setValorDeposito] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [total, setTotal] = useState('');
 
-  async function carregarMetas() {
-    const { data, error } = await supabase.from('Metas').select('*').order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Erro ao buscar metas:', error.message);
-    } else {
-      // Atualiza o estado global com as metas carregadas
-      // Aqui você pode usar um contexto ou estado global para armazenar as metas
-    }
-  }
 
-  useEffect(() => {
-    carregarMetas();
-  }, []);
 
-  const metasAndamento = metas.filter((m: Meta) => m.atual < m.total);
-  const metasConcluidas = metas.filter((m: Meta) => m.atual >= m.total);
+const metasAndamento = (metas ?? []).filter(
+    (m: Meta) => m.atual < m.total
+);
+
+const metasConcluidas = (metas ?? []).filter(
+    (m: Meta) => m.atual >= m.total
+);
 
   const salvar = async () => {
-    if (!titulo || !total) return;
 
-    const valorTotal = parseFloat(total.replace(',', '.'));
-    const { data, error } = await supabase.from('Metas').insert([{ 
-      titulo: titulo,
-      valor_objetivo: valorTotal,
-      valor_atual: 0, 
-    }
-  ]);
+  if (!titulo.trim()) return;
 
-    if (error) {
-      console.error('Erro ao salvar no supabase:', error.message);
-    }
+  if (!total.trim()) return;
 
-    adicionarMeta({
-      titulo,
-      atual: 0,
-      total: valorTotal,
-    });
+  const valor = Number(total.replace(',', '.'));
 
-    setTitulo('');
-    setTotal('');
-    setModalAberto(false);
-  };
+  if (isNaN(valor)) return;
+
+  await adicionarMeta(titulo, valor);
+
+Alert.alert('Sucesso', 'Meta criada com sucesso!');
+
+  setTitulo('');
+  setTotal('');
+  setModalAberto(false);
+
+};
+
+if (carregandoMetas) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}
+    >
+      <Text>Carregando metas...</Text>
+    </View>
+  );
+}
 
 
   return (
@@ -78,12 +83,19 @@ export default function Metas() {
         <>
           <Text style={styles.secaoTitulo}>EM ANDAMENTO</Text>
           {metasAndamento.map((meta: Meta) => {
-            const pct = Math.round((meta.atual / meta.total) * 100);
+            const pct =
+  meta.total > 0
+    ? Math.min(Math.round((meta.atual / meta.total) * 100), 100)
+    : 0;
             return (
               <View key={meta.id} style={styles.card}>
                 <View style={styles.cardHeader}>
                   <Text style={styles.metaTitulo}>{meta.titulo}</Text>
-                  <TouchableOpacity onPress={() => excluirMeta(meta.id)}>
+                  <TouchableOpacity
+  onPress={async () => {
+    await excluirMeta(meta.id);
+  }}
+>
                     <Trash2 size={18} color="#ccc" />
                   </TouchableOpacity>
                 </View>
@@ -128,7 +140,7 @@ export default function Metas() {
       )}
 
       {/* Vazio */}
-      {metas.length === 0 && (
+      {(metas ?? []).length === 0 && (
         <View style={styles.vazio}>
           <Target size={48} color="#1A9E75" />
           <Text style={styles.vazioTitulo}>Nenhuma meta ainda</Text>
@@ -187,12 +199,22 @@ export default function Metas() {
 
             <TouchableOpacity
               style={styles.btnSalvar}
-              onPress={() => {
-                if (!valorDeposito || !metaSelecionada) return;
-                depositar(metaSelecionada, parseFloat(valorDeposito.replace(',', '.')));
-                setValorDeposito('');
-                setMetaSelecionada(null);
-              }}
+              onPress={async () => {
+    if (!valorDeposito || !metaSelecionada) return;
+
+    const valor = Number(valorDeposito.replace(',', '.'));
+
+if (isNaN(valor) || valor <= 0) {
+    return;
+}
+
+await depositar(metaSelecionada, valor);
+
+Alert.alert('Sucesso', 'Depósito realizado!');
+
+    setValorDeposito('');
+    setMetaSelecionada(null);
+}}
             >
               <Text style={styles.btnSalvarTexto}>Confirmar</Text>
             </TouchableOpacity>

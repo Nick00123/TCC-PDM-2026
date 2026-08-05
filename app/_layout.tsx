@@ -1,5 +1,12 @@
 import { Stack } from 'expo-router';
-import React, { createContext, useContext, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+} from 'react';
+
+import { supabase } from './supabaseClient';
 
 export type Usuario = {
   nome: string;
@@ -35,6 +42,7 @@ export default function RootLayout() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [carregandoMetas, setCarregandoMetas] = useState(true);
 
   const logout = () => setUsuario(null);
 
@@ -45,14 +53,88 @@ export default function RootLayout() {
   const removerTransacao = (id: string) =>
     setTransacoes(prev => prev.filter(t => t.id !== id));
 
-  const adicionarMeta = (m: Omit<Meta, 'id'>) =>
-    setMetas(prev => [...prev, { ...m, id: Date.now().toString() }]);
+  async function carregarMetas() {
+  setCarregandoMetas(true);
 
-  const depositar = (id: string, valor: number) =>
-    setMetas(prev => prev.map(m => m.id === id ? { ...m, atual: m.atual + valor } : m));
+  const { data, error } = await supabase
+  .from('Metas')
+  .select('*')
+  .order('created_at', { ascending: false });
 
-  const excluirMeta = (id: string) =>
-    setMetas(prev => prev.filter(m => m.id !== id));
+console.log("Dados:", data);
+console.log("Erro:", error);
+
+  if (error) {
+    console.error(error);
+    setCarregandoMetas(false);
+    return;
+  }
+
+  const lista: Meta[] =
+  data?.map((item: any) => ({
+    id: item.id,
+    titulo: item.titulo,
+    atual: Number(item.valor_atual),
+    total: Number(item.valor_objetivo),
+  })) ?? [];
+
+  setMetas(lista);
+  setCarregandoMetas(false);
+}
+
+async function adicionarMeta(titulo: string, total: number) {
+  const { error } = await supabase
+    .from('Metas')
+    .insert({
+  titulo,
+  valor_objetivo: total,
+  valor_atual: 0,
+});
+
+ if (error) {
+    console.error("Erro ao adicionar meta:", error);
+    return;
+}
+
+  await carregarMetas();
+}
+
+async function excluirMeta(id: string) {
+  const { error } = await supabase
+    .from('Metas')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  await carregarMetas();
+}
+
+async function depositar(id: string, valor: number) {
+
+  const meta = metas.find(m => m.id === id);
+
+  if (!meta) return;
+
+  const novoValor = meta.atual + valor;
+
+  const { error } = await supabase
+    .from('Metas')
+    .update({
+    valor_atual: novoValor,
+})
+    .eq('id', id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  await carregarMetas();
+}
 
   const totalReceitas = transacoes
     .filter(t => t.tipo === 'receita')
@@ -64,14 +146,36 @@ export default function RootLayout() {
 
   const saldoTotal = totalReceitas - totalDespesas;
 
+  useEffect(() => {
+    const carregar = async () => {
+        await carregarMetas();
+    };
+
+    carregar();
+}, []);
+
   return (
     <AuthContext.Provider value={{ usuario, setUsuario, logout }}>
-      <FinanceContext.Provider value={{
-        transacoes, metas,
-        adicionarTransacao, removerTransacao, // 🔴 Passado aqui pro Provider!
-        adicionarMeta, depositar, excluirMeta,
-        saldoTotal, totalReceitas, totalDespesas,
-      }}>
+      <FinanceContext.Provider
+  value={{
+    transacoes,
+    metas,
+
+    adicionarTransacao,
+    removerTransacao,
+
+    adicionarMeta,
+    excluirMeta,
+    depositar,
+    carregarMetas,
+
+    carregandoMetas,
+
+    saldoTotal,
+    totalReceitas,
+    totalDespesas,
+  }}
+>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="telalogin" />
           <Stack.Screen name="telainicial" />
