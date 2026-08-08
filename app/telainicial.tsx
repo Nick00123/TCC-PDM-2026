@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TextInput, View } from 'react-native';
 // Importando seu componente que criamos antes
-import Botao from '../components/Botao';
+import Botao from '../src/componentes/Botao';
 
 export default function App() {
   const [nome, setNome] = useState('');

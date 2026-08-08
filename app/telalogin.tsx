@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Alert, Image, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { supabase } from '../src/api/supabaseCliente';
+import { usuarioApi } from '../src/api/usuarioApi';
+import Botao from '../src/componentes/Botao';
 import { useAuth } from './_layout';
-import Botao from '../components/Botao';
 
 export default function App() {
   const [gmail, setGmail] = useState('');
@@ -18,31 +20,33 @@ export default function App() {
     router.push('/telainicial2');
   };*/}
 
-  const confirmar = () => {
+const confirmar = async () => {
   if (!gmail || !senha) {
     Alert.alert("Erro", "Preencha os campos!");
     return;
   }
 
   if (aba === 'entrar') {
-    setUsuario({
-      nome: gmail.split('@')[0], // usa a parte antes do @ como nome
-      email: gmail,
-      rendaMensal: 0,
-      plano: 'free',
-    });
+    const { usuario, mensagem } = await usuarioApi.entrar(gmail, senha);
+    if (!usuario) {
+      // Exibe o motivo real do Supabase (senha incorreta, e-mail não confirmado, etc.)
+      Alert.alert("Erro no login", mensagem || "Não foi possível entrar.");
+      return;
+    }
+    setUsuario(usuario);
     router.replace('/');
   } else {
     if (!nome) {
       Alert.alert("Erro", "Preencha o nome!");
       return;
     }
-    setUsuario({
-      nome,
-      email: gmail,
-      rendaMensal: 0,
-      plano: 'free',
-    });
+    const { usuario, mensagem } = await usuarioApi.cadastrar(nome, gmail, senha);
+    if (!usuario) {
+      // Se o e-mail precisa de confirmação, orientamos o usuário a confirmá-lo.
+      Alert.alert(mensagem?.startsWith("Conta criada") ? "Verifique seu e-mail" : "Erro no cadastro", mensagem || "Não foi possível criar a conta.");
+      return;
+    }
+    setUsuario(usuario);
     router.replace('/telainicial');
   }
 };
@@ -81,12 +85,14 @@ export default function App() {
         {aba === 'entrar' ? (
           // O QUE APARECE NA ABA ENTRAR
           <View>
-            <Text style={styles.label}>E-mail</Text>
+<Text style={styles.label}>E-mail</Text>
             <TextInput 
               style={styles.input}
               placeholder="Digite seu e-mail"
               value={gmail}
-              onChangeText={setGmail}
+              onChangeText={(t) => setGmail(t.trim())}
+              autoCapitalize="none"
+              keyboardType="email-address"
             />
             
             <Text style={styles.label}>Senha</Text>
@@ -99,6 +105,26 @@ export default function App() {
             />
             
             <Botao title="Acessar Conta" onPress={confirmar} color="#7DC1A8" />
+
+            <Pressable
+              style={styles.link}
+              onPress={async () => {
+                if (!gmail) {
+                  Alert.alert('Esqueci minha senha', 'Digite seu e-mail acima para receber o link de redefinição.');
+                  return;
+                }
+                const { error } = await supabase.auth.resetPasswordForEmail(gmail, {
+                  redirectTo: 'com.edufinance.app://reset',
+                });
+                if (error) {
+                  Alert.alert('Erro', 'Não foi possível enviar o link. Tente novamente.');
+                } else {
+                  Alert.alert('E-mail enviado!', `Enviamos um link de redefinição de senha para ${gmail}. Verifique sua caixa de entrada.`);
+                }
+              }}
+            >
+              <Text style={styles.linkTexto}>Esqueci minha senha</Text>
+            </Pressable>
           </View>
         ) : (
           // O QUE APARECE NA ABA CRIAR CONTA
@@ -202,7 +228,7 @@ const styles = StyleSheet.create({
     borderColor: '#E9ECEF',
     marginBottom: 15,
   },
-  footerText: {
+footerText: {
     marginTop: 25,
     fontSize: 11,
     color: '#F7FFF7',
@@ -210,5 +236,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  link: {
+    marginTop: 14,
+    alignSelf: 'center',
+  },
+  linkTexto: {
+    color: '#1A9E75',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

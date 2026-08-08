@@ -1,0 +1,17 @@
+-- ═══════════════════════════════════════════════════════════════════
+-- ⚠️  DEPRECIADO — NÃO EXECUTAR ESTE ARQUIVO  ⚠️
+-- ═══════════════════════════════════════════════════════════════════
+--
+-- Este arquivo anteriormente desabilitava o Row Level Security (RLS)
+-- de todas as tabelas, o que DEIXAVA OS DADOS EXPOSTOS publicamente.
+--
+-- Como o app agora utiliza autenticação real do Supabase (Auth),
+-- o RLS DEVE permanecer ATIVO para proteger os dados de cada usuário.
+--
+-- ❌ NÃO execute os comandos abaixo.
+-- ✅ Em vez disso, execute:  supabase/habilitar_rls.sql
+--
+-- Em caso de necessidade pontual de diagnóstico, a reativação segura
+-- deve ser feita reexecutando o arquivo `habilitar_rls.sql`.
+-- ═══════════════════════════════════════════════════════════════════
+

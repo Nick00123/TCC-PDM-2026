@@ -1,6 +1,7 @@
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import React from 'react';
-import { Text, View, StyleSheet } from 'react-native';
-import { ArrowUpRight, ArrowDownLeft } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { formatarMoeda } from '../utils/formatacao';
 
 type Props = {
   saldo: number;
@@ -9,41 +10,29 @@ type Props = {
 };
 
 export default function BalanceCard({ saldo, receitas, despesas }: Props) {
-  // Função auxiliar para formatar em moeda brasileira (R$)
-  const formatCurrency = (val: number) => {
-    return val.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
   return (
     <View style={styles.card}>
-      {/* Saldo Total */}
       <Text style={styles.label}>Saldo Total</Text>
-      <Text style={styles.saldo}>R$ {formatCurrency(saldo)}</Text>
+      <Text style={styles.saldo}>R$ {formatarMoeda(saldo)}</Text>
 
-      {/* Mini-cards (Receitas e Despesas) */}
       <View style={styles.row}>
-        {/* Card Receitas */}
         <View style={styles.caixinha}>
           <View style={styles.iconCircle}>
             <ArrowUpRight color="#FFFFFF" size={18} />
           </View>
           <View style={styles.caixinhaTextos}>
             <Text style={styles.caixinhaLabel}>Receitas</Text>
-            <Text style={styles.caixinhaValor}>R$ {formatCurrency(receitas)}</Text>
+            <Text style={styles.caixinhaValor}>R$ {formatarMoeda(receitas)}</Text>
           </View>
         </View>
 
-        {/* Card Despesas */}
         <View style={styles.caixinha}>
           <View style={styles.iconCircle}>
             <ArrowDownLeft color="#FFFFFF" size={18} />
           </View>
           <View style={styles.caixinhaTextos}>
             <Text style={styles.caixinhaLabel}>Despesas</Text>
-            <Text style={styles.caixinhaValor}>R$ {formatCurrency(despesas)}</Text>
+            <Text style={styles.caixinhaValor}>R$ {formatarMoeda(despesas)}</Text>
           </View>
         </View>
       </View>
@@ -53,7 +42,7 @@ export default function BalanceCard({ saldo, receitas, despesas }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#26A69A', // Verde Teal idêntico ao modelo
+    backgroundColor: '#26A69A',
     padding: 20,
     borderRadius: 24,
     marginHorizontal: 16,
@@ -71,10 +60,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 20,
   },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  row: { flexDirection: 'row', gap: 12 },
   caixinha: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
@@ -92,9 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  caixinhaTextos: {
-    flexDirection: 'column',
-  },
+  caixinhaTextos: { flexDirection: 'column' },
   caixinhaLabel: {
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',

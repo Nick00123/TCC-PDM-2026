@@ -1,6 +1,7 @@
 import { CreditCard, DollarSign, Filter, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { corDaCategoria, formatarData, normalizarData } from '../../src/utils/formatacao';
 import { Transacao, useFinance } from '../_layout';
 
 type Filtro = 'todos' | 'receitas' | 'despesas';
@@ -8,29 +9,6 @@ type TipoModal = 'receita' | 'despesa' | null;
 
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
-
-const formatarData = (dataStr: string) => {
-  if (!dataStr) return '';
-  const meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
-                 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const partes = dataStr.split('-');
-  if (partes.length < 3) return dataStr;
-  
-  const dia = partes[2];
-  const mesIndex = parseInt(partes[1], 10) - 1;
-  return `${dia} de ${meses[mesIndex] || ''}`;
-};
-
-// Cores de fundo para os ícones por categoria (estilo Base44)
-const getCorCategoria = (categoria: string, tipo: 'receita' | 'despesa') => {
-  if (tipo === 'receita') return '#DCFCE7'; // Verde claro
-  switch (categoria.toLowerCase()) {
-    case 'transporte': return '#E0F2FE'; // Azul claro
-    case 'alimentação': return '#DCFCE7'; // Verde pastel
-    case 'assinaturas': return '#E0E7FF'; // Roxo/Azul
-    default: return '#F1F5F9'; // Cinza neutro
-  }
-};
 
 export default function Transacoes() {
   const { transacoes, adicionarTransacao, removerTransacao } = useFinance();
@@ -41,16 +19,7 @@ export default function Transacoes() {
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
-  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
-
-  const normalizarData = (dataStr: string) => {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dataStr)) return dataStr;
-    const ptBr = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(dataStr);
-    if (ptBr) return `${ptBr[3]}-${ptBr[2]}-${ptBr[1]}`;
-    const dash = /^(\d{2})-(\d{2})-(\d{4})$/.exec(dataStr);
-    if (dash) return `${dash[3]}-${dash[2]}-${dash[1]}`;
-    return dataStr;
-  };
+const [data, setData] = useState(new Date().toISOString().split('T')[0]);
 
   const transacoesFiltradas = transacoes
     .filter((t: Transacao) => {
@@ -201,7 +170,7 @@ export default function Transacoes() {
 
             {grupo.itens.map((t: Transacao) => (
               <View key={t.id} style={styles.item}>
-                <View style={[styles.iconeWrap, { backgroundColor: getCorCategoria(t.categoria, t.tipo) }]}>
+<View style={[styles.iconeWrap, { backgroundColor: corDaCategoria(t.categoria, t.tipo) }]}>
                   {typeof t.icone === 'string' ? <Text style={styles.iconeText}>{t.icone}</Text> : t.icone}
                 </View>
                 

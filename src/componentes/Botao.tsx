@@ -10,7 +10,6 @@ type BotaoProps = {
 };
 
 const Botao = (props: BotaoProps) => {
-
   let title = props.title || "Título";
   let onPress = props.onPress;
   let color = props.color || '#73b05f';
@@ -28,7 +27,7 @@ const Botao = (props: BotaoProps) => {
           paddingHorizontal: 30,
           borderRadius: 18,
         },
-        style
+        style,
       ]}
     >
       <Text
@@ -38,14 +37,14 @@ const Botao = (props: BotaoProps) => {
             fontWeight: 'bold',
             textAlign: 'center',
           },
-          textStyle
+          textStyle,
         ]}
       >
         {title}
       </Text>
     </Pressable>
   );
-}
+};
 
 Botao.displayName = "Botao";
 

@@ -1,19 +1,19 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { ArrowDownLeft, ArrowUpRight, BarChart2, Target } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const acoes = [
-  { label: 'Receita',   icone: ArrowDownLeft, cor: '#E6F4EA', corIcone: '#1A9E75', rota: '/transacoes' },
-  { label: 'Despesa',   icone: ArrowUpRight,  cor: '#FCE8E6', corIcone: '#E53935', rota: '/transacoes' },
-  { label: 'Relatório', icone: BarChart2,     cor: '#F3E8FF', corIcone: '#8E24AA', rota: '/relatorios' },
-  { label: 'Metas',     icone: Target,        cor: '#FEF7E0', corIcone: '#F57F17', rota: '/metas' },
+  { label: 'Receita', icone: ArrowDownLeft, cor: '#E6F4EA', corIcone: '#1A9E75', rota: '/transacoes' },
+  { label: 'Despesa', icone: ArrowUpRight, cor: '#FCE8E6', corIcone: '#E53935', rota: '/transacoes' },
+  { label: 'Relatório', icone: BarChart2, cor: '#F3E8FF', corIcone: '#8E24AA', rota: '/relatorios' },
+  { label: 'Metas', icone: Target, cor: '#FEF7E0', corIcone: '#F57F17', rota: '/metas' },
 ];
 
 export default function AcoesRapidas() {
   return (
     <View style={styles.container}>
-      {acoes.map(acao => {
+      {acoes.map((acao) => {
         const Icone = acao.icone;
         return (
           <TouchableOpacity
@@ -22,12 +22,9 @@ export default function AcoesRapidas() {
             onPress={() => router.push(acao.rota as any)}
             activeOpacity={0.7}
           >
-            {/* Quadrado Colorido do Ícone */}
             <View style={[styles.boxIcone, { backgroundColor: acao.cor }]}>
               <Icone size={22} color={acao.corIcone} />
             </View>
-
-            {/* Texto fora da caixinha */}
             <Text style={styles.label}>{acao.label}</Text>
           </TouchableOpacity>
         );
@@ -45,10 +42,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  item: {
-    alignItems: 'center',
-    flex: 1,
-  },
+  item: { alignItems: 'center', flex: 1 },
   boxIcone: {
     width: 56,
     height: 56,

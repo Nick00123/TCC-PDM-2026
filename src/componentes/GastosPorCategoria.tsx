@@ -1,7 +1,8 @@
-import { Transacao, useFinance } from '@/app/_layout';
 import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryPie } from 'victory-native';
+import { useFinance } from '../contextos/FinanceContexto';
+import type { Transacao } from '../tipos';
 
 const CORES = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 
@@ -9,7 +10,6 @@ export default function GastosPorCategoria() {
   const { transacoes } = useFinance();
   useWindowDimensions();
 
-  // Agrupa gastos por categoria
   const categorias: { [key: string]: number } = {};
   transacoes
     .filter((t: Transacao) => t.tipo === 'despesa')
@@ -19,13 +19,11 @@ export default function GastosPorCategoria() {
 
   const total = Object.values(categorias).reduce((a, b) => a + b, 0);
 
-  // Mapeia os dados para o gráfico (sem rótulo interno)
   const dados = Object.entries(categorias).map(([nome, valor]) => ({
     x: nome,
     y: valor,
   }));
 
-  // Mapeia os itens da legenda personalizada
   const listaCategorias = Object.entries(categorias).map(([nome, valor], index) => {
     const porcentagem = total > 0 ? Math.round((valor / total) * 100) : 0;
     return {
@@ -42,7 +40,6 @@ export default function GastosPorCategoria() {
       <Text style={styles.titulo}>Gastos por Categoria</Text>
 
       <View style={styles.containerGrafico}>
-        {/* Gráfico de Rosca (Donut) sem rótulos nas fatias */}
         <View style={styles.pieContainer}>
           <VictoryPie
             data={dados}
@@ -51,11 +48,10 @@ export default function GastosPorCategoria() {
             colorScale={CORES}
             innerRadius={48}
             padding={0}
-            labels={() => null} // Remove o texto de dentro do gráfico
+            labels={() => null}
           />
         </View>
 
-        {/* Legenda Estilizada idêntica ao modelo */}
         <View style={styles.legendaContainer}>
           {listaCategorias.map((item) => (
             <View key={item.nome} style={styles.itemLegenda}>
@@ -81,7 +77,6 @@ const styles = StyleSheet.create({
     padding: 40,
     marginHorizontal: 16,
     marginBottom: 16,
-    // Sombra suave estilo cartão
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -105,11 +100,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  legendaContainer: {
-    flex: 1,
-    marginLeft: 20,
-    gap: 10,
-  },
+  legendaContainer: { flex: 1, marginLeft: 20, gap: 10 },
   itemLegenda: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,16 +112,8 @@ const styles = StyleSheet.create({
     gap: 8,
     flex: 1,
   },
-  indicadorCor: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  nomeCategoria: {
-    fontSize: 13,
-    color: '#555555',
-    fontWeight: '500',
-  },
+  indicadorCor: { width: 8, height: 8, borderRadius: 4 },
+  nomeCategoria: { fontSize: 13, color: '#555555', fontWeight: '500' },
   porcentagem: {
     fontSize: 13,
     fontWeight: 'bold',

@@ -1,20 +1,16 @@
-import React from 'react';
-import { Text, View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Bell } from 'lucide-react-native';
+import React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 type CabecalhoProps = {
-  /** Quantidade de notificações não lidas (Padrão: 0) */
   notificacoesCount?: number;
-  /** Função executada ao clicar no sininho */
   onPressNotificacoes?: () => void;
 };
 
-export default function Cabecalho({ 
-  notificacoesCount = 0, // ← Definido como 0 para não exibir nenhuma notificação por enquanto
-  onPressNotificacoes 
+export default function Cabecalho({
+  notificacoesCount = 0,
+  onPressNotificacoes,
 }: CabecalhoProps) {
-  
-  // Função executada quando o usuário clica no sininho
   const handlePress = () => {
     if (onPressNotificacoes) {
       onPressNotificacoes();
@@ -25,21 +21,17 @@ export default function Cabecalho({
 
   return (
     <View style={styles.container}>
-      {/* Bloco de Texto (Esquerda) */}
       <View style={styles.textosContainer}>
         <Text style={styles.subtitulo}>Bem-vindo ao</Text>
         <Text style={styles.titulo}>EduFinance</Text>
       </View>
 
-      {/* Botão do Sininho (Totalmente clicável) */}
-      <TouchableOpacity 
-        style={styles.botaoNotificacao} 
+      <TouchableOpacity
+        style={styles.botaoNotificacao}
         onPress={handlePress}
-        activeOpacity={0.6} // Feedback visual ao toque
+        activeOpacity={0.6}
       >
         <Bell color="#4A5568" size={22} />
-        
-        {/* Renderiza o badge APENAS se houver notificações (> 0) */}
         {notificacoesCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeTexto}>
@@ -61,20 +53,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 12,
   },
-  textosContainer: {
-    justifyContent: 'center',
-  },
-  subtitulo: {
-    fontSize: 14,
-    color: '#718096',
-    fontWeight: '400',
-  },
-  titulo: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1A202C',
-    marginTop: 2,
-  },
+  textosContainer: { justifyContent: 'center' },
+  subtitulo: { fontSize: 14, color: '#718096', fontWeight: '400' },
+  titulo: { fontSize: 22, fontWeight: 'bold', color: '#1A202C', marginTop: 2 },
   botaoNotificacao: {
     width: 44,
     height: 44,
@@ -82,7 +63,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    // Sombra leve circular
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -102,9 +82,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 3,
   },
-  badgeTexto: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
+  badgeTexto: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 });

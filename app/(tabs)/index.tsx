@@ -1,10 +1,10 @@
-import EvolucaoMensal from '@/components/EvolucaoMensal';
-import GastosPorCategoria from '@/components/GastosPorCategoria';
-import AcoesRapidas from '../../components/AcoesRapidas';
-import BalanceCard from '../../components/BalanceCard';
-import Cabecalho from '../../components/Cabecalho';
-import MetaCard from '../../components/MetaCard';
-import TransacaoItem from '../../components/TransacaoItem';
+import EvolucaoMensal from '@/src/componentes/EvolucaoMensal';
+import GastosPorCategoria from '@/src/componentes/GastosPorCategoria';
+import AcoesRapidas from '../../src/componentes/AcoesRapidas';
+import BalanceCard from '../../src/componentes/BalanceCard';
+import Cabecalho from '../../src/componentes/Cabecalho';
+import MetaCard from '../../src/componentes/MetaCard';
+import TransacaoItem from '../../src/componentes/TransacaoItem';
 import { Meta, Transacao, useFinance } from '../_layout';
 
 //import { useFinance } from '../_layout';

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryGroup, VictoryTheme } from 'victory-native';
-import { useFinance, Transacao } from '@/app/_layout';
+import { useFinance } from '../contextos/FinanceContexto';
+import type { Transacao } from '../tipos';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
                'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -15,7 +16,6 @@ export default function EvolucaoMensal() {
   const { transacoes } = useFinance();
   const [semestre, setSemestre] = useState<1 | 2>(1);
 
-  // Usar índice numérico como x para evitar labels duplicadas do VictoryGroup (ó biblioteca chatinha)
   const dados = MESES.map((label, i) => {
     const receita = transacoes
       .filter((t: Transacao) => t.tipo === 'receita' && new Date(t.data).getMonth() === i)
@@ -31,7 +31,6 @@ export default function EvolucaoMensal() {
   const dadosSemestre = semestre === 1 ? dados.slice(0, 6) : dados.slice(6, 12);
   const labelsDoSemestre = dadosSemestre.map((d) => d.mes);
 
-  // Calcular domínio Y real; forçar mínimo de 100 para evitar notação científica
   const maxValor = Math.max(
     ...dadosSemestre.map((d) => Math.max(d.receita, d.despesa)),
     100
@@ -45,11 +44,9 @@ export default function EvolucaoMensal() {
 
   return (
     <View style={styles.card}>
-      {/* Cabeçalho */}
       <View style={styles.cabecalho}>
         <Text style={styles.titulo}>Evolução mensal</Text>
 
-        {/* Toggle semestre */}
         <View style={styles.toggle}>
           <Pressable
             style={[styles.toggleBtn, semestre === 1 && styles.toggleBtnAtivo]}
@@ -70,7 +67,6 @@ export default function EvolucaoMensal() {
         </View>
       </View>
 
-      {/* Legenda */}
       <View style={styles.legenda}>
         <View style={styles.legendaItem}>
           <View style={[styles.legendaCor, { backgroundColor: COR_RECEITA }]} />
@@ -82,7 +78,6 @@ export default function EvolucaoMensal() {
         </View>
       </View>
 
-      {/* Gráfico */}
       <VictoryChart
         width={largura}
         height={220}
@@ -91,7 +86,6 @@ export default function EvolucaoMensal() {
         domain={{ y: [0, maxValor] }}
         padding={{ top: 10, bottom: 36, left: 52, right: 16 }}
       >
-        {/* Eixo X: tickValues numéricos + tickFormat converte pra nome do mês */}
         <VictoryAxis
           tickValues={dadosSemestre.map((d) => d.x)}
           tickFormat={(_, i) => labelsDoSemestre[i] ?? ''}
@@ -150,11 +144,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  titulo: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
+  titulo: { fontSize: 15, fontWeight: '600', color: '#1a1a1a' },
   toggle: {
     flexDirection: 'row',
     borderWidth: 0.5,
@@ -167,35 +157,11 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     backgroundColor: 'transparent',
   },
-  toggleBtnAtivo: {
-    backgroundColor: '#e8f5f0',
-  },
-  toggleText: {
-    fontSize: 12,
-    color: '#999',
-    fontWeight: '400',
-  },
-  toggleTextAtivo: {
-    color: '#1a9e75',
-    fontWeight: '600',
-  },
-  legenda: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 4,
-  },
-  legendaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  legendaCor: {
-    width: 10,
-    height: 10,
-    borderRadius: 2,
-  },
-  legendaLabel: {
-    fontSize: 12,
-    color: '#888',
-  },
+  toggleBtnAtivo: { backgroundColor: '#e8f5f0' },
+  toggleText: { fontSize: 12, color: '#999', fontWeight: '400' },
+  toggleTextAtivo: { color: '#1a9e75', fontWeight: '600' },
+  legenda: { flexDirection: 'row', gap: 16, marginBottom: 4 },
+  legendaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendaCor: { width: 10, height: 10, borderRadius: 2 },
+  legendaLabel: { fontSize: 12, color: '#888' },
 });

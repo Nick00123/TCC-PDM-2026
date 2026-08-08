@@ -1,6 +1,7 @@
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { formatarMoeda } from '../../src/utils/formatacao';
 import { Meta, useFinance } from '../_layout';
 
 export default function Metas() {
@@ -106,8 +107,8 @@ if (carregandoMetas) {
 
                 <View style={styles.cardFooter}>
                   <View>
-                    <Text style={styles.valorAtual}>R$ {meta.atual.toFixed(2)}</Text>
-                    <Text style={styles.valorTotal}>de R$ {meta.total.toFixed(2)}</Text>
+<Text style={styles.valorAtual}>R$ {formatarMoeda(meta.atual)}</Text>
+                    <Text style={styles.valorTotal}>de R$ {formatarMoeda(meta.total)}</Text>
                   </View>
                   <Text style={styles.pct}>{pct}%</Text>
                 </View>
@@ -130,7 +131,7 @@ if (carregandoMetas) {
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.metaTitulo}>{meta.titulo}</Text>
-                  <Text style={styles.concluidaTexto}>Concluída! R$ {meta.total.toFixed(2)}</Text>
+<Text style={styles.concluidaTexto}>Concluída! R$ {formatarMoeda(meta.total)}</Text>
                 </View>
                 <Check size={22} color="#1A9E75" />
               </View>
