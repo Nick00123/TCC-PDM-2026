@@ -1,3 +1,4 @@
+import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { formatarMoeda } from '../utils/formatacao';
@@ -10,18 +11,21 @@ type Props = {
   tipo: 'receita' | 'despesa';
 };
 
-export default function TransacaoItem({ icone, descricao, categoria, valor, tipo }: Props) {
+export default function TransacaoItem({ descricao, categoria, valor, tipo }: Props) {
+  const isReceita = tipo === 'receita';
+  const Icone = isReceita ? ArrowUpRight : ArrowDownLeft;
+
   return (
     <View style={styles.item}>
-      <View style={styles.iconeBox}>
-        <Text style={styles.icone}>{icone}</Text>
+      <View style={[styles.iconeBox, { backgroundColor: isReceita ? '#DCFCE7' : '#FFE4E6' }]}>
+        <Icone size={20} color={isReceita ? '#1a9e75' : '#e53935'} />
       </View>
       <View style={styles.info}>
         <Text style={styles.descricao}>{descricao}</Text>
         <Text style={styles.categoria}>{categoria}</Text>
       </View>
-      <Text style={[styles.valor, { color: tipo === 'receita' ? '#1a9e75' : '#e53935' }]}>
-        {tipo === 'receita' ? '+' : '-'}R$ {formatarMoeda(valor)}
+      <Text style={[styles.valor, { color: isReceita ? '#1a9e75' : '#e53935' }]}>
+        {isReceita ? '+' : '-'}R$ {formatarMoeda(valor)}
       </Text>
     </View>
   );
@@ -42,11 +46,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f4f8',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  icone: { fontSize: 24, color: '#1a9e75' },
   info: { flex: 1, marginLeft: 12 },
   descricao: { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
   categoria: { fontSize: 12, color: '#888' },

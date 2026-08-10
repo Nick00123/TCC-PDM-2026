@@ -1,28 +1,54 @@
-# TODO — Login real com Supabase Auth + RLS seguro + fix usuario_id
+# TODO - Melhorias de UI/UX (Flexbox, Dicas e Transições)
 
-## Descobertas
-- Login atual era local (AuthContexto), sem Supabase Auth real.
-- `usuarioApi.ts` já tinha os métodos, mas nunca eram usados na tela de login.
-- RLS estava DESABILITADO (`supabase/desabilitar_rls.sql`) => dados expostos.
-- Colunas: `transacoes.usuario_id`, `Metas.user_id`, `perfis.id = auth.uid()`.
+## Passos (concluídos)
+- [x] 1. Analisar o projeto e montar o plano (aprovado)
+- [x] 2. Adicionar transições suaves (slide/fade) no `app/_layout.tsx` (Stack)
+- [x] 3. Adicionar transição fade nas Tabs em `app/(tabs)/_layout.tsx`
+- [x] 4. Corrigir responsividade do grid de resumo em `app/(tabs)/relatorios.tsx`
+- [x] 5. Corrigir responsividade da grade de meses no modal de `relatorios.tsx`
+- [x] 6. Tornar o gráfico "Gastos por Categoria" responsivo em `src/componentes/GastosPorCategoria.tsx`
+- [x] 7. Adicionar `flexShrink` no `src/componentes/BalanceCard.tsx`
+- [x] 8. Reescrever a seção "Curso Rápido" em `app/(tabs)/dicas.tsx` com conteúdo melhor
+- [x] 9. Adicionar `flexShrink`/ajustes de responsividade em `dicas.tsx`
+- [x] 10. Rodar `npx tsc --noEmit` para checar tipos
 
-## Etapas — Código (concluídas)
+## Dependências / Arquivos editados (anteriores)
+- app/_layout.tsx
+- app/(tabs)/_layout.tsx
+- app/(tabs)/dicas.tsx
+- app/(tabs)/relatorios.tsx
+- src/componentes/GastosPorCategoria.tsx
+- src/componentes/BalanceCard.tsx
 
-- [x] 1. Adicionar `id` ao tipo `Usuario` (`src/tipos/index.ts`)
-- [x] 2. `usuarioApi.ts`: retornar `id` do usuário autenticado em `entrar`/`cadastrar`
-- [x] 3. `AuthContexto.tsx`: hidratar sessão via `getSession`/`onAuthStateChange` e `logout()` com `signOut`
-- [x] 4. `app/telalogin.tsx`: usar `usuarioApi.entrar`/`cadastrar` no lugar do `setUsuario` local
-- [x] 5. `perfilApi.ts`: incluir `id` no objeto retornado
-- [x] 6. `FinanceContexto.tsx`: carregar dados somente quando houver usuário autenticado (`usuario.id`)
-- [x] 7. `transacoesApi.ts`: incluir `usuario_id` no insert (corrige o erro 23502)
-- [x] 8. `metasApi.ts`: incluir `user_id` no insert
+---
 
-## Etapas — SQL
+# NOVOS AJUSTES (aprovados)
 
-- [x] 9. Criar `supabase/habilitar_rls.sql` (reaativar RLS + políticas por usuário)
-- [x] 10. Substituir `supabase/desabilitar_rls.sql` por aviso de depreciação
+## 1. 🔔 Sistema de Notificações
+- [x] Criar tabela `notificacoes` no Supabase (SQL + RLS) em `supabase/notificacoes.sql`
+- [x] Criar API `src/api/notificacoesApi.ts` (listar, criar, marcar lida, excluir)
+- [x] Criar contexto `src/contextos/NotificacoesContexto.tsx` (carrega notificações, marca lida, gera automáticas)
+- [x] Criar componente modal `src/componentes/NotificacoesModal.tsx` (lista das notificações)
+- [x] Envolver app com `NotificacoesProvider` em `_layout.tsx`
+- [x] Ligar `Cabecalho` (sino) ao contexto (contador + abertura do modal)
+- [x] Gerar notificações automáticas: meta concluída, despesa acima da receita, dicas, boas-vindas
 
-## Ação manual pendente
-- [x] 11. **EXECUTAR** `supabase/habilitar_rls.sql` no SQL Editor do painel do Supabase (📌 IMPORTANTE! Sem isso, o RLS continua desligado e as policies do app ficam sem efeito).
-- [ ] 12. Confirmar que o provedor **Email** está habilitado (já confirmado pelo usuário) e que a "Confirm email" ativa não impede o login de contas já confirmadas.
+## 2. 📚 Tela de Dicas (cards clicáveis)
+- [x] Remover seção "Curso Rápido" (`LICOES` + renderização) de `app/(tabs)/dicas.tsx`
+- [x] Adicionar campo de conteúdo detalhado/didático a cada `Dica`
+- [x] Tornar os cards de `DICAS` clicáveis abrindo um modal com explicação detalhada
 
+## 3. ⚙️ Limite de exibição na tela inicial
+- [x] Limitar exibição a **5 metas** e **5 transações** em `app/(tabs)/index.tsx`
+- [x] Adicionar botão "Ver mais" para navegar às abas `Metas` e `Transações`
+
+## 4. 🔧 Correção FinanceContexto (linha 104)
+- [x] Corrigir `carregandoMetas` travado em `true` quando há early-return na `carregarMetas()`
+
+## 5. ✔️ Validação final
+- [x] Rodar `npx tsc --noEmit` para checar tipos
+
+
+## 6. Ajustes
+ - [] Ta tendo um problema de repetição no notificação, por exemplo, quando eu entro com a minha conta no app no notificação aparece uma mensagem de conclusão de metas, so que se eu sair do app e entrar novamente logando a minha conta novamente aparece a mesma mensagem so que repetida, num é tanto alguns testes, tem a mesma notificação de 1d, 1d e 3min atras, o que n deveria acontecer.
+ - [] Agora na parte de perfil, no termos de uso e Politica de privacidade não tem nada e nem backup na Nuvem (eu gostaria de trocar essa parte por outra coisa, não me parece algo interessante em um app de financia ter uma backup aqui), nas perguntas Freauentes, só é uma caixa de texto, no feedback, poderia trocar esses emojis por icones da biblioteca que já está instaldada, o mesmo vale para o emoji de estrela do 'EduFinance v1.0'

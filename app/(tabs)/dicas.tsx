@@ -1,6 +1,6 @@
-import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp } from 'lucide-react-native';
-import React from 'react';
-import { ImageBackground, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp, X } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Transacao, useFinance } from '../_layout';
 
 type Dica = {
@@ -9,6 +9,7 @@ type Dica = {
   descricao: string;
   categoria: 'Educação' | 'Investimento' | 'Comportamento' | 'Segurança' | 'Crédito';
   icone: React.ReactNode;
+  conteudo: string[];
 };
 
 const DICAS: Dica[] = [
@@ -18,6 +19,13 @@ const DICAS: Dica[] = [
     descricao: 'Necessidades 50%, desejos 30%, poupança/investimento 20%. Simples e eficaz para qualquer renda.',
     categoria: 'Educação',
     icone: <Ruler size={28} color="#1A9E75" />,
+    conteudo: [
+      'A regra 50-30-20 é um método simples de orçamento criado pela senadora Elizabeth Warren.',
+      '50% da sua renda deve ir para necessidades: moradia, contas, alimentação, transporte.',
+      '30% para desejos: lazer, restaurantes, assinaturas, viagens.',
+      '20% para poupança e investimentos: o famoso "pague-se primeiro".',
+      'Dica: ajuste os percentuais conforme sua realidade, mas mantenha a disciplina de separar pelo menos 20% para poupar.',
+    ],
   },
   {
     id: '2',
@@ -25,6 +33,13 @@ const DICAS: Dica[] = [
     descricao: 'R$ 200/mês investidos a 10% ao ano por 10 anos viram mais de R$ 38.000. Comece cedo!',
     categoria: 'Investimento',
     icone: <TrendingUp size={28} color="#1A9E75" />,
+    conteudo: [
+      'Juros compostos são os "juros sobre juros": o rendimento do mês se soma ao valor e volta a render no mês seguinte.',
+      'O grande segredo é o TEMPO. Quanto mais cedo você começa, maior o efeito da bola de neve.',
+      'Exemplo: investir R$ 200/mês a 1% ao mês por 10 anos gera cerca de R$ 46.000, sendo R$ 24.000 de aportes e R$ 22.000 de juros.',
+      'A constância vence o valor: R$ 50 todo mês rende mais que R$ 500 de vez em quando.',
+      'Aplicação prática: invista de forma automática todo mês e não interrompa nos primeiros meses ruins.',
+    ],
   },
   {
     id: '3',
@@ -32,6 +47,13 @@ const DICAS: Dica[] = [
     descricao: 'Espere 24h antes de qualquer compra não planejada. Você vai se surpreender com quantas vontades passam!',
     categoria: 'Comportamento',
     icone: <Brain size={28} color="#6A1B9A" />,
+    conteudo: [
+      'Compras por impulso são responsáveis por grande parte do descontrole financeiro.',
+      'A regra das 24 horas: ao sentir vontade de comprar algo não planejado, espere um dia.',
+      'Na maioria das vezes, a "vontade" passa e você percebe que não precisava daquilo.',
+      'Dica extra: liste o que você quer comprar e revise a lista após 1 semana. Só compre o que ainda fizer sentido.',
+      'Evite salvar cartão em lojas online e desinstale apps de compras se necessário.',
+    ],
   },
   {
     id: '4',
@@ -39,6 +61,13 @@ const DICAS: Dica[] = [
     descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
     categoria: 'Segurança',
     icone: <Shield size={28} color="#1A9E75" />,
+    conteudo: [
+      'O fundo de emergência é o seu colchão de segurança para imprevistos.',
+      'Serve para: perda de emprego, problemas de saúde, consertos urgentes.',
+      'O ideal é guardar de 3 a 6 meses das suas despesas mensais.',
+      'Deixe esse dinheiro em um local seguro e de resgate rápido, como o Tesouro Selic ou CDB com liquidez diária.',
+      'Regra de ouro: NUNCA use esse dinheiro para viagens, compras ou vontades.',
+    ],
   },
   {
     id: '5',
@@ -46,6 +75,13 @@ const DICAS: Dica[] = [
     descricao: 'CDB, Tesouro Direto e fundos são boas opções para começar com pouco dinheiro.',
     categoria: 'Investimento',
     icone: <DollarSign size={28} color="#1A9E75" />,
+    conteudo: [
+      'Não precisa de muito dinheiro para começar a investir. R$100/mês já fazem diferença.',
+      'Tesouro Direto: título público, seguro e com opções para todos os perfis.',
+      'CDB: emitido por bancos, com proteção do FGC até R$250 mil por instituição.',
+      'Fundos de investimento: geridos por profissionais, com aporte inicial baixo.',
+      'Comece pelo Tesouro Selic (mais seguro) e vá estudando para expandir sua carteira.',
+    ],
   },
   {
     id: '6',
@@ -53,6 +89,13 @@ const DICAS: Dica[] = [
     descricao: 'Nossas emoções afetam nossas decisões financeiras. Entender isso é o primeiro passo.',
     categoria: 'Comportamento',
     icone: <Puzzle size={28} color="#6A1B9A" />,
+    conteudo: [
+      'Nossas decisões financeiras são 80% comportamento e apenas 20% conhecimento.',
+      'Entenda seus gatilhos de consumo: estresse, ansiedade, comparação social.',
+      'Crie barreiras: defina limites de gasto, use dinheiro em espécie, evite parcelamentos longos.',
+      'Automatize suas finanças: poupe antes de gastar, com transferência automática.',
+      'Celebre pequenas vitórias: cada meta alcançada reforça o hábito saudável.',
+    ],
   },
 ];
 
@@ -124,6 +167,7 @@ const CORES_TEXTO: { [key: string]: string } = {
 
 export default function Dicas() {
   const { transacoes, totalReceitas, totalDespesas } = useFinance();
+  const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
 
   // Lógica da dica personalizada
   const getDicaPersonalizada = () => {
@@ -194,11 +238,17 @@ export default function Dicas() {
         <Text style={styles.dicaDestaqueTexto}>{dicaPersonalizada.descricao}</Text>
       </View>
 
-      {/* Lista de dicas */}
+      {/* Lista de dicas (clicáveis) */}
       <Text style={styles.secaoTitulo}>Central de Aprendizado</Text>
+      <Text style={styles.secaoSubtitulo}>Toque em um card para ver o conteúdo completo</Text>
 
       {DICAS.map(dica => (
-        <View key={dica.id} style={styles.dicaCard}>
+        <TouchableOpacity
+          key={dica.id}
+          style={styles.dicaCard}
+          onPress={() => setDicaAberta(dica)}
+          activeOpacity={0.7}
+        >
           <View style={styles.dicaIcone}>{dica.icone}</View>
           <View style={styles.dicaInfo}>
             <View style={styles.dicaHeaderRow}>
@@ -210,45 +260,88 @@ export default function Dicas() {
               </View>
             </View>
             <Text style={styles.dicaDescricao} numberOfLines={2}>{dica.descricao}</Text>
-            {/* <Text style={styles.dicaTempo}>{dica.tempo}</Text> */}
+            <Text style={styles.verDetalhe}>Ver conteúdo completo ▸</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ))}
 
       {/* Seção de vídeos */}
-    <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
+      <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
 
-<ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
-  {VIDEOS.map(video => (
-    <TouchableOpacity
-      key={video.id}
-      style={styles.videoCard}
-      onPress={() => Linking.openURL(video.url)}
-    >
-      {/* Thumbnail */}
-      <ImageBackground
-        source={{ uri: video.thumbnail || getYoutubeThumbnail(video.url) }}
-        style={styles.thumbnail}
-        imageStyle={styles.thumbnailImage}
-        resizeMode="cover"
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
+        {VIDEOS.map(video => (
+          <TouchableOpacity
+            key={video.id}
+            style={styles.videoCard}
+            onPress={() => Linking.openURL(video.url)}
+          >
+            {/* Thumbnail */}
+            <ImageBackground
+              source={{ uri: video.thumbnail || getYoutubeThumbnail(video.url) }}
+              style={styles.thumbnail}
+              imageStyle={styles.thumbnailImage}
+              resizeMode="cover"
+            >
+              <View style={styles.playOverlay}>
+                <Play size={28} color="#fff" fill="#fff" />
+              </View>
+            </ImageBackground>
+
+            {/* Info */}
+            <View style={styles.videoInfo}>
+              <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}>
+                <Text style={[styles.badgeTexto, { color: '#2E7D32' }]}>{video.categoria}</Text>
+              </View>
+              <Text style={styles.videoTitulo} numberOfLines={2}>{video.titulo}</Text>
+              <Text style={styles.videoCanal}>{video.canal}</Text>
+              <Text style={styles.videoDuracao}>⏱ {video.duracao}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Modal de detalhes da dica */}
+      <Modal
+        visible={dicaAberta !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDicaAberta(null)}
       >
-        <View style={styles.playOverlay}>
-          <Play size={28} color="#fff" fill="#fff" />
-        </View>
-      </ImageBackground>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconeMesa}>
+                {dicaAberta?.icone}
+              </View>
+              <Text style={styles.modalTitulo}>{dicaAberta?.titulo}</Text>
+              <TouchableOpacity onPress={() => setDicaAberta(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <X size={22} color="#666" />
+              </TouchableOpacity>
+            </View>
 
-      {/* Info */}
-      <View style={styles.videoInfo}>
-        <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}>
-          <Text style={[styles.badgeTexto, { color: '#2E7D32' }]}>{video.categoria}</Text>
+            <View style={[styles.badge, { backgroundColor: dicaAberta ? CORES_CATEGORIA[dicaAberta.categoria] : '#E8F5E9', alignSelf: 'flex-start', marginBottom: 12 }]}>
+              <Text style={[styles.badgeTexto, { color: dicaAberta ? CORES_TEXTO[dicaAberta.categoria] : '#2E7D32' }]}>
+                {dicaAberta?.categoria}
+              </Text>
+            </View>
+
+            <ScrollView style={styles.modalConteudo} showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalDescricao}>{dicaAberta?.descricao}</Text>
+              <View style={styles.modalDivisor} />
+              {dicaAberta?.conteudo.map((item, idx) => (
+                <View key={idx} style={styles.conteudoItem}>
+                  <Text style={styles.conteudoBullet}>•</Text>
+                  <Text style={styles.conteudoTexto}>{item}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.btnEntendi} onPress={() => setDicaAberta(null)}>
+              <Text style={styles.btnEntendiTexto}>Entendi!</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.videoTitulo} numberOfLines={2}>{video.titulo}</Text>
-        <Text style={styles.videoCanal}>{video.canal}</Text>
-        <Text style={styles.videoDuracao}>⏱ {video.duracao}</Text>
-      </View>
-    </TouchableOpacity>
-  ))}
-</ScrollView>
+      </Modal>
 
     </ScrollView>
   );
@@ -291,8 +384,14 @@ const styles = StyleSheet.create({
   fontSize: 16,
   fontWeight: 'bold',
   marginHorizontal: 16,
-  marginBottom: 12,
+  marginBottom: 4,
   marginTop: 8,
+},
+secaoSubtitulo: {
+  fontSize: 12,
+  color: '#888',
+  marginHorizontal: 16,
+  marginBottom: 12,
 },
 videosScroll: { paddingLeft: 16, marginBottom: 24 },
 videoCard: {
@@ -354,13 +453,64 @@ videoDuracao: { fontSize: 11, color: '#aaa', marginTop: 4 },
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  dicaTitulo: { fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
+dicaTitulo: { fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 20,
+    flexShrink: 0,
   },
   badgeTexto: { fontSize: 11, fontWeight: '600' },
-  dicaDescricao: { fontSize: 13, color: '#666', lineHeight: 18, marginBottom: 4 },
-  dicaTempo: { fontSize: 11, color: '#aaa' },
+dicaDescricao: { fontSize: 13, color: '#666', lineHeight: 18, marginBottom: 4 },
+verDetalhe: { fontSize: 12, color: '#1A9E75', fontWeight: '600', marginTop: 2 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    width: '100%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalIconeMesa: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#F0FDF4',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  modalTitulo: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', flex: 1 },
+  modalConteudo: { flexGrow: 0, maxHeight: '60%' },
+  modalDescricao: { fontSize: 14, color: '#64748B', lineHeight: 20 },
+  modalDivisor: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 12,
+  },
+  conteudoItem: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  conteudoBullet: { fontSize: 14, color: '#1A9E75', marginRight: 8, fontWeight: 'bold' },
+  conteudoTexto: { fontSize: 14, color: '#333', lineHeight: 20, flex: 1 },
+  btnEntendi: {
+    backgroundColor: '#1A9E75',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  btnEntendiTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

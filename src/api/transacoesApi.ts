@@ -25,14 +25,14 @@ export const transacoesApi = {
       return [];
     }
 
-    return data?.map((item: any): Transacao => ({
+return data?.map((item: any): Transacao => ({
       id: item.id,
       descricao: item.descricao,
       categoria: item.categoria,
       valor: Number(item.valor),
       data: item.data,
       tipo: item.tipo,
-      icone: item.categoria,
+      icone: item.tipo,
     })) ?? [];
   },
 

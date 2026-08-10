@@ -1,6 +1,8 @@
 import { Bell } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useNotificacoes } from '../contextos/NotificacoesContexto';
+import NotificacoesModal from './NotificacoesModal';
 
 type CabecalhoProps = {
   notificacoesCount?: number;
@@ -8,14 +10,20 @@ type CabecalhoProps = {
 };
 
 export default function Cabecalho({
-  notificacoesCount = 0,
+  notificacoesCount,
   onPressNotificacoes,
 }: CabecalhoProps) {
+  const { naoLidas } = useNotificacoes();
+  const [modalAberto, setModalAberto] = useState(false);
+
+  // Se o usuário passar via props, usa o valor controlado; senão usa o contexto
+  const contador = notificacoesCount ?? naoLidas;
+
   const handlePress = () => {
     if (onPressNotificacoes) {
       onPressNotificacoes();
     } else {
-      console.log('Sininho clicado! (Adicione a navegação ou modal aqui futuramente)');
+      setModalAberto(true);
     }
   };
 
@@ -32,14 +40,19 @@ export default function Cabecalho({
         activeOpacity={0.6}
       >
         <Bell color="#4A5568" size={22} />
-        {notificacoesCount > 0 && (
+        {contador > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeTexto}>
-              {notificacoesCount > 9 ? '9+' : notificacoesCount}
+              {contador > 9 ? '9+' : contador}
             </Text>
           </View>
         )}
       </TouchableOpacity>
+
+      <NotificacoesModal
+        visivel={modalAberto}
+        onFechar={() => setModalAberto(false)}
+      />
     </View>
   );
 }

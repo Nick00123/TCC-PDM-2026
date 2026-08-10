@@ -433,16 +433,19 @@ const styles = StyleSheet.create({
   },
   badgeMesTexto: { fontSize: 12, color: '#3A3A3C', fontWeight: '500' },
 
-  grid: {
+grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
-    gap: 12,
     marginTop: 16,
     marginBottom: 16,
+    justifyContent: 'space-between',
   },
   card: {
-    width: '48%',
+    flexBasis: '48%',
+    flexGrow: 0,
+    flexShrink: 1,
+    marginBottom: 12,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 14,
@@ -549,14 +552,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalTitulo: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-  gridMeses: {
+gridMeses: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
     justifyContent: 'space-between',
   },
   itemMes: {
-    width: '30%',
+    flexBasis: '31%',
+    flexGrow: 0,
+    flexShrink: 1,
+    marginBottom: 8,
     paddingVertical: 10,
     borderRadius: 8,
     backgroundColor: '#F2F2F7',

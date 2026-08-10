@@ -8,7 +8,10 @@ const CORES = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722',
 
 export default function GastosPorCategoria() {
   const { transacoes } = useFinance();
-  useWindowDimensions();
+  const { width } = useWindowDimensions();
+
+  // Tamanho do donut dimensionado conforme a tela (metade da largura disponível)
+  const tamanhoPie = Math.min(width / 2.4, 170);
 
   const categorias: { [key: string]: number } = {};
   transacoes
@@ -39,14 +42,14 @@ export default function GastosPorCategoria() {
     <View style={styles.card}>
       <Text style={styles.titulo}>Gastos por Categoria</Text>
 
-      <View style={styles.containerGrafico}>
-        <View style={styles.pieContainer}>
+<View style={styles.containerGrafico}>
+        <View style={[styles.pieContainer, { width: tamanhoPie, height: tamanhoPie }]}>
           <VictoryPie
             data={dados}
-            width={160}
-            height={160}
+            width={tamanhoPie}
+            height={tamanhoPie}
             colorScale={CORES}
-            innerRadius={48}
+            innerRadius={tamanhoPie * 0.3}
             padding={0}
             labels={() => null}
           />
@@ -71,10 +74,10 @@ export default function GastosPorCategoria() {
 }
 
 const styles = StyleSheet.create({
-  card: {
+card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 40,
+    padding: 20,
     marginHorizontal: 16,
     marginBottom: 16,
     shadowColor: '#000',

@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  caixinhaTextos: { flexDirection: 'column' },
+caixinhaTextos: { flexDirection: 'column', flexShrink: 1 },
   caixinhaLabel: {
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.8)',
@@ -89,5 +89,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginTop: 2,
+    flexShrink: 1,
   },
 });

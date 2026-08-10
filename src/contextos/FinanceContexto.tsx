@@ -1,8 +1,10 @@
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from 'react';
 import { metasApi } from '../api/metasApi';
@@ -42,13 +44,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
 
+  // Guarda o id do usuário "atual" para descartar respostas de um
+  // usuário anterior (previne que dados de uma conta sobrescrevam a outra
+  // ao fazer logout/login rápido — race condition).
+  const userIdRef = useRef<string | null>(null);
+
+const usuarioId = usuario?.id ?? null;
+
   // ── METAS ────────────────────────────────────────────────
-  async function carregarMetas() {
+  const carregarMetas = useCallback(async () => {
     setCarregandoMetas(true);
     const lista = await metasApi.listar();
+    // Se o usuário mudou durante a busca, descarta o resultado e
+    // garante que o estado de carregamento não fique travado em `true`.
+    if (userIdRef.current !== usuarioId) {
+      setCarregandoMetas(false);
+      return;
+    }
     setMetas(lista);
     setCarregandoMetas(false);
-  }
+  }, [usuarioId]);
 
   async function adicionarMeta(titulo: string, total: number) {
     await metasApi.criar(titulo, total);
@@ -66,10 +81,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   }
 
   // ── TRANSAÇÕES ───────────────────────────────────────────
-  async function carregarTransacoes() {
+  const carregarTransacoes = useCallback(async () => {
     const lista = await transacoesApi.listar();
+    if (userIdRef.current !== usuarioId) return;
     setTransacoes(lista);
-  }
+  }, [usuarioId]);
 
   async function adicionarTransacao(t: Omit<Transacao, 'id'>) {
     const ok = await transacoesApi.criar(t);
@@ -83,7 +99,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   // Carrega dados quando o usuário autenticado muda (login/logout)
   useEffect(() => {
-    if (!usuario?.id) {
+    userIdRef.current = usuarioId;
+
+    if (!usuarioId) {
       setTransacoes([]);
       setMetas([]);
       setCarregandoMetas(false);
@@ -91,7 +109,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     carregarMetas();
     carregarTransacoes();
-  }, [usuario?.id]);
+  }, [usuarioId, carregarMetas, carregarTransacoes]);
 
   // ── RESUMO ───────────────────────────────────────────────
   const { totalReceitas, totalDespesas, saldoTotal } =

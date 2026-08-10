@@ -19,6 +19,7 @@ export default function TabsLayout() {
           fontSize: 11,
           fontWeight: '600',
         },
+        animation: 'fade',
       }}
     >
       <Tabs.Screen
@@ -57,8 +58,8 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-         name="metas"
-         options={{
+        name="metas"
+        options={{
           title: 'Metas',
           tabBarIcon: ({ color }) => <Target size={22} color={color} />,
         }}

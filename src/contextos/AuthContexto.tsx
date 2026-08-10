@@ -11,14 +11,14 @@ import type { Usuario } from '../tipos';
 type AuthContextoType = {
   usuario: Usuario | null;
   setUsuario: React.Dispatch<React.SetStateAction<Usuario | null>>;
-  logout: () => void;
+  logout: () => Promise<void>;
   carregando: boolean;
 };
 
 const AuthContexto = createContext<AuthContextoType>({
   usuario: null,
   setUsuario: () => {},
-  logout: () => {},
+  logout: async () => {},
   carregando: true,
 });
 

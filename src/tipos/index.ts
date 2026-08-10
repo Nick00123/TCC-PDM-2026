@@ -31,3 +31,12 @@ export type Dica = {
   descricao: string;
   categoria: string;
 };
+
+export type Notificacao = {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  tipo: 'meta' | 'alerta' | 'dica' | 'sistema';
+  lida: boolean;
+  criadaEm: string;
+};

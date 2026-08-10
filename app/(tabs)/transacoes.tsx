@@ -1,4 +1,4 @@
-import { CreditCard, DollarSign, Filter, Plus, Trash2, X } from 'lucide-react-native';
+import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { corDaCategoria, formatarData, normalizarData } from '../../src/utils/formatacao';
@@ -83,15 +83,13 @@ const [data, setData] = useState(new Date().toISOString().split('T')[0]);
     const dataObj = new Date(dataFormatada);
     if (isNaN(dataObj.getTime())) return;
     
-    adicionarTransacao({
+adicionarTransacao({
       descricao,
       categoria,
       valor: parseFloat(valor.replace(',', '.')),
       data: dataFormatada,
       tipo: modalTipo,
-      icone: modalTipo === 'receita'
-        ? <DollarSign size={20} color="#0D9488" />
-        : <CreditCard size={20} color="#E11D48" />,
+      icone: modalTipo,
     });
 
     limparForm();
@@ -168,10 +166,12 @@ const [data, setData] = useState(new Date().toISOString().split('T')[0]);
                 </Text>
             </View>
 
-            {grupo.itens.map((t: Transacao) => (
+{grupo.itens.map((t: Transacao) => (
               <View key={t.id} style={styles.item}>
 <View style={[styles.iconeWrap, { backgroundColor: corDaCategoria(t.categoria, t.tipo) }]}>
-                  {typeof t.icone === 'string' ? <Text style={styles.iconeText}>{t.icone}</Text> : t.icone}
+                  {t.tipo === 'receita'
+                    ? <ArrowUpRight size={20} color="#0D9488" />
+                    : <ArrowDownRight size={20} color="#E11D48" />}
                 </View>
                 
                 <View style={styles.itemInfo}>

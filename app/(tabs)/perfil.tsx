@@ -1,33 +1,46 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight, FileText, HelpCircle, LogOut, Shield, Target } from 'lucide-react-native';
+import { ChevronRight, FileText, HelpCircle, LogOut, Send, Shield, Target } from 'lucide-react-native';
 import { useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { CategoriaFeedback, feedbackApi } from '../../src/api/feedbackApi';
 import { useAuth, useFinance } from '../_layout';
+
+const CATEGORIAS_FEEDBACK: { chave: CategoriaFeedback; label: string }[] = [
+  { chave: 'sugestao', label: '💡 Sugestão' },
+  { chave: 'bug', label: '🐞 Bug' },
+  { chave: 'elogio', label: '⭐ Elogio' },
+];
 
 export default function Perfil() {
   const { totalReceitas, totalDespesas } = useFinance();
   const { usuario, logout } = useAuth();
   const [temaEscuro, setTemaEscuro] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [categoriaFeedback, setCategoriaFeedback] = useState<CategoriaFeedback>('sugestao');
+  const [enviandoFeedback, setEnviandoFeedback] = useState(false);
+  const [feedbackEnviado, setFeedbackEnviado] = useState(false);
+  const [saindo, setSaindo] = useState(false);
   const router = useRouter();
 
-  // const theme = temaEscuro
-  //   ? {
-  //       container: { backgroundColor: '#121212' },
-  //       sectionBg: '#1A1A1A',
-  //       card: '#181818',
-  //       text: '#F5F5F5',
-  //       subText: '#C2C2C2',
-  //       border: '#2A2A2A',
-  //     }
-  //   : {
-  //       container: { backgroundColor: '#F5F5F5' },
-  //       sectionBg: '#fff',
-  //       card: '#fff',
-  //       text: '#222',
-  //       subText: '#888',
-  //       border: '#F5F5F5',
-  //     };
+  const enviarFeedback = async () => {
+    if (enviandoFeedback) return;
+    const texto = feedback.trim();
+    if (!texto) {
+      Alert.alert('Atenção', 'Escreva sua mensagem antes de enviar.');
+      return;
+    }
+    setEnviandoFeedback(true);
+    const resultado = await feedbackApi.enviar(texto, categoriaFeedback);
+    setEnviandoFeedback(false);
+
+    if (resultado.sucesso) {
+      setFeedback('');
+      setFeedbackEnviado(true);
+      setTimeout(() => setFeedbackEnviado(false), 4000);
+    }
+    Alert.alert(resultado.sucesso ? 'Sucesso' : 'Ops', resultado.mensagem);
+  };
+
   const theme = {
     container: { backgroundColor: '#F5F5F5' },
     sectionBg: '#fff',
@@ -41,7 +54,7 @@ export default function Perfil() {
     <ScrollView style={[styles.container, theme.container]}>
 
       {/* Card do usuário */}
-      <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' /* temaEscuro ? '#1A1A1A' : '#1A9E75' */ }]}> 
+      <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' }]}>
         <View style={styles.avatar}>
           <Text style={styles.avatarTexto}>
             {usuario?.nome ? usuario.nome[0].toUpperCase() : 'U'}
@@ -54,9 +67,9 @@ export default function Perfil() {
       </View>
 
       {/* Resumo financeiro */}
-      <View style={[styles.resumo, { backgroundColor: theme.card }]}> 
+      <View style={[styles.resumo, { backgroundColor: theme.card }]}>
         <View style={styles.resumoItem}>
-          <Text style={[styles.resumoValor, { color: '#1A9E75' /* temaEscuro ? '#80E2B5' : '#1A9E75' */ }]}>R$ {totalReceitas.toFixed(2)}</Text>
+          <Text style={[styles.resumoValor, { color: '#1A9E75' }]}>R$ {totalReceitas.toFixed(2)}</Text>
           <Text style={[styles.resumoLabel, { color: theme.subText }]}>Receitas</Text>
         </View>
         <View style={styles.divisor} />
@@ -68,9 +81,8 @@ export default function Perfil() {
 
       {/* Configurações */}
       <Text style={[styles.secaoTitulo, { color: theme.subText }]}>CONFIGURAÇÕES</Text>
-      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}> 
-
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}> 
+      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}>
+        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.itemEsquerda}>
             <Target size={20} color="#1A9E75" />
             <View>
@@ -80,16 +92,12 @@ export default function Perfil() {
           </View>
           <Switch
             value={temaEscuro}
-            onValueChange={(value) => {
-              setTemaEscuro(value);
-              // A lógica de troca de tema global foi temporariamente desativada.
-              // Futuramente, essa ação poderá acionar o contexto de tema.
-            }}
+            onValueChange={(value) => setTemaEscuro(value)}
             trackColor={{ true: '#1A9E75' }}
           />
         </View>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}> 
+        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
             <View>
@@ -100,7 +108,7 @@ export default function Perfil() {
           <ChevronRight size={18} color="#ccc" />
         </View>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}> 
+        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.itemEsquerda}>
             <Shield size={20} color="#1A9E75" />
             <View>
@@ -113,8 +121,8 @@ export default function Perfil() {
 
       {/* Ajuda e suporte */}
       <Text style={styles.secaoTitulo}>AJUDA E SUPORTE</Text>
-      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}> 
-        <View style={[styles.faqCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}> 
+      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}>
+        <View style={[styles.faqCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <Text style={[styles.itemTitulo, { color: theme.text }]}>Perguntas Frequentes (FAQ)</Text>
           <Text style={[styles.faqText, { color: theme.subText }]}>• Como adicionar uma nova receita/despesa?</Text>
           <Text style={[styles.faqText, { color: theme.subText }]}>• Os meus dados financeiros estão seguros?</Text>
@@ -133,19 +141,56 @@ export default function Perfil() {
           <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
 
-        <View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}> 
+<View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.itemTitulo, { color: theme.text }]}>Feedback / Enviar Sugestão</Text>
+          <Text style={[styles.feedbackSubtitulo, { color: theme.subText }]}>
+            Sua mensagem vai direto para os desenvolvedores do app.
+          </Text>
+
+          {/* Seleção de categoria */}
+          <View style={styles.categoriaRow}>
+            {CATEGORIAS_FEEDBACK.map((cat) => {
+              const ativa = categoriaFeedback === cat.chave;
+              return (
+                <TouchableOpacity
+                  key={cat.chave}
+                  style={[styles.categoriaChip, ativa && styles.categoriaChipAtivo]}
+                  onPress={() => setCategoriaFeedback(cat.chave)}
+                >
+                  <Text style={[styles.categoriaTexto, ativa && styles.categoriaTextoAtivo]}>
+                    {cat.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <TextInput
             style={[styles.feedbackInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.sectionBg }]}
             placeholder="Escreva sua ideia de melhoria"
-            placeholderTextColor="#999" /* temaEscuro ? '#BBB' : '#999' */
+            placeholderTextColor="#999"
             value={feedback}
             onChangeText={setFeedback}
             multiline
           />
+
+          {feedbackEnviado && (
+            <Text style={styles.feedbackSucesso}>✓ Feedback enviado com sucesso!</Text>
+          )}
+
+          <TouchableOpacity
+            style={[styles.btnEnviarFeedback, { backgroundColor: '#1A9E75' }]}
+            onPress={enviarFeedback}
+            disabled={enviandoFeedback}
+          >
+            <Send size={16} color="#fff" />
+            <Text style={styles.btnEnviarFeedbackTexto}>
+              {enviandoFeedback ? 'Enviando...' : 'Enviar Feedback'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}> 
+        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.itemEsquerda}>
             <HelpCircle size={20} color="#1A9E75" />
             <View>
@@ -161,12 +206,23 @@ export default function Perfil() {
       <Text style={[styles.versao, { color: theme.text }]}>⭐ EduFinance v1.0</Text>
       <Text style={[styles.subVersao, { color: theme.subText }]}>Feito para jovens que querem organizar as finanças</Text>
 
-      <TouchableOpacity style={styles.btnSair} onPress={() => {
-        logout();
-        router.replace('/telalogin');
-      }}>
+      <TouchableOpacity
+        style={styles.btnSair}
+        disabled={saindo}
+        onPress={async () => {
+          if (saindo) return;
+          setSaindo(true);
+          try {
+            await logout();
+            router.replace('/telalogin');
+          } catch (e) {
+            console.error('Erro ao sair:', e);
+            setSaindo(false);
+          }
+        }}
+      >
         <LogOut size={18} color="#F44336" />
-        <Text style={styles.btnSairTexto}>Sair da Conta</Text>
+        <Text style={styles.btnSairTexto}>{saindo ? 'Saindo...' : 'Sair da Conta'}</Text>
       </TouchableOpacity>
 
     </ScrollView>
@@ -241,13 +297,31 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   contactButtonText: { color: '#fff', fontWeight: '700' },
-  feedbackBox: {
+feedbackBox: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
     padding: 16,
   },
+  feedbackSubtitulo: { fontSize: 12, color: '#888', marginTop: 4 },
+  categoriaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
+  },
+  categoriaChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  categoriaChipAtivo: { backgroundColor: '#1A9E75', borderColor: '#1A9E75' },
+  categoriaTexto: { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  categoriaTextoAtivo: { color: '#fff' },
   feedbackInput: {
     minHeight: 100,
     borderWidth: 1,
@@ -258,6 +332,22 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     color: '#333',
   },
+  feedbackSucesso: {
+    color: '#1A9E75',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
+  },
+  btnEnviarFeedback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 12,
+    marginTop: 12,
+  },
+  btnEnviarFeedbackTexto: { color: '#fff', fontSize: 15, fontWeight: '700' },
   versao: { textAlign: 'center', fontSize: 14, fontWeight: '600', color: '#333' },
   subVersao: { textAlign: 'center', fontSize: 12, color: '#888', marginTop: 4 },
   btnSair: {
