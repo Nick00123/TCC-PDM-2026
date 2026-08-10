@@ -1,30 +1,52 @@
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from 'react';
+
 import { notificacoesApi } from '../api/notificacoesApi';
-import type { Meta, Notificacao, Transacao } from '../tipos';
+
+import type {
+  Meta,
+  Notificacao,
+  Transacao,
+} from '../tipos';
+
 import { useAuth } from './AuthContexto';
+
 
 type NotificacoesContextoType = {
   notificacoes: Notificacao[];
   naoLidas: number;
   carregando: boolean;
+
   recarregar: () => Promise<void>;
-  marcarLida: (id: string) => Promise<void>;
+
+  marcarLida: (
+    id: string
+  ) => Promise<void>;
+
   marcarTodasLidas: () => Promise<void>;
-  excluir: (id: string) => Promise<void>;
+
+  excluir: (
+    id: string
+  ) => Promise<void>;
 };
 
-const NotificacoesContexto = createContext<NotificacoesContextoType>(
-  {} as NotificacoesContextoType
-);
 
-export const useNotificacoes = () => useContext(NotificacoesContexto);
+const NotificacoesContexto =
+  createContext(
+    {} as NotificacoesContextoType
+  );
+
+
+export const useNotificacoes =
+  () => useContext(NotificacoesContexto);
+
 
 type Props = {
   children: ReactNode;
@@ -32,94 +54,475 @@ type Props = {
   transacoes: Transacao[];
 };
 
-export function NotificacoesProvider({ children, metas, transacoes }: Props) {
+
+export function NotificacoesProvider({
+  children,
+  metas,
+  transacoes,
+}: Props) {
+
   const { usuario } = useAuth();
-  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
-  const [carregando, setCarregando] = useState(true);
 
-  // Guarda o id do usuário atual para descartar respostas antigas
-  const userIdRef = useRef<string | null>(null);
-  // Evita disparar notificações automáticas repetidas
-  const metasAvisadasRef = useRef<Set<string>>(new Set());
-  const avisouDespesaRef = useRef(false);
+  const [
+    notificacoes,
+    setNotificacoes,
+  ] = useState<Notificacao[]>([]);
 
-  async function recarregar() {
-    const lista = await notificacoesApi.listar();
-    if (userIdRef.current !== usuario?.id) return;
-    setNotificacoes(lista);
-    setCarregando(false);
-  }
+  const [
+    carregando,
+    setCarregando,
+  ] = useState(true);
 
-  // Carrega notificações quando o usuário muda
+
+  /*
+   * Guarda o usuário atual.
+   *
+   * Isso evita que uma resposta antiga de uma conta
+   * sobrescreva os dados de outra conta.
+   */
+  const userIdRef =
+    useRef<string | null>(null);
+
+
+  /*
+   * Guarda quais metas já foram processadas
+   * durante a execução atual do aplicativo.
+   *
+   * A proteção REAL contra duplicação fica no banco,
+   * através da chave_evento.
+   */
+  const metasAvisadasRef =
+    useRef<Set<string>>(new Set());
+
+
+  /*
+   * Controle da notificação de despesas maiores
+   * que receitas.
+   */
+  const avisouDespesaRef =
+    useRef(false);
+
+
+  /*
+   * Impede que duas verificações automáticas
+   * sejam executadas simultaneamente.
+   */
+  const verificandoRef =
+    useRef(false);
+
+
+  /*
+   * Recarrega as notificações do usuário.
+   *
+   * useCallback é usado para que a função tenha
+   * uma referência estável e possa ser usada
+   * corretamente como dependência dos useEffects.
+   */
+  const recarregar = useCallback(
+    async () => {
+
+      const usuarioAtual =
+        usuario?.id ?? null;
+
+
+      if (!usuarioAtual) {
+        setNotificacoes([]);
+        return;
+      }
+
+
+      const lista =
+        await notificacoesApi.listar();
+
+
+      /*
+       * Se o usuário mudou enquanto a consulta
+       * estava acontecendo, descarta a resposta.
+       */
+      if (
+        userIdRef.current !== usuarioAtual
+      ) {
+        return;
+      }
+
+
+      setNotificacoes(lista);
+
+    },
+    [usuario?.id]
+  );
+
+
+  /*
+   * Carrega as notificações quando o usuário
+   * entra ou sai da conta.
+   */
   useEffect(() => {
-    userIdRef.current = usuario?.id ?? null;
-    if (!usuario?.id) {
+
+    const usuarioId =
+      usuario?.id ?? null;
+
+
+    userIdRef.current =
+      usuarioId;
+
+
+    /*
+     * Ao trocar de usuário, limpamos os controles
+     * temporários da conta anterior.
+     */
+    metasAvisadasRef.current.clear();
+
+    avisouDespesaRef.current = false;
+
+    verificandoRef.current = false;
+
+
+    if (!usuarioId) {
+
       setNotificacoes([]);
+
       setCarregando(false);
+
       return;
     }
+
+
+    let ativo = true;
+
+
     setCarregando(true);
-    recarregar();
+
+
+    async function carregar() {
+
+      const lista =
+        await notificacoesApi.listar();
+
+
+      if (!ativo) {
+        return;
+      }
+
+
+      if (
+        userIdRef.current !== usuarioId
+      ) {
+        return;
+      }
+
+
+      setNotificacoes(lista);
+
+      setCarregando(false);
+    }
+
+
+    carregar();
+
+
     return () => {
-      userIdRef.current = null;
+      ativo = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [usuario?.id]);
 
-  // Gera notificações automáticas com base em metas e transações
+
+  /*
+   * Verifica e cria notificações automáticas.
+   */
   useEffect(() => {
-    if (!usuario?.id) return;
-    if (carregando) return;
 
-    // 1) Meta concluída
-    metas
-      .filter((m: Meta) => m.atual >= m.total && !metasAvisadasRef.current.has(m.id))
-      .forEach((m: Meta) => {
-        metasAvisadasRef.current.add(m.id);
-        notificacoesApi.criar({
-          titulo: '🎉 Meta concluída!',
-          mensagem: `Parabéns! Você alcançou a meta "${m.titulo}".`,
-          tipo: 'meta',
-        }).then(() => recarregar());
-      });
-
-    // 2) Despesas maiores que receitas
-    const totalReceitas = transacoes
-      .filter((t: Transacao) => t.tipo === 'receita')
-      .reduce((acc, t) => acc + t.valor, 0);
-    const totalDespesas = transacoes
-      .filter((t: Transacao) => t.tipo === 'despesa')
-      .reduce((acc, t) => acc + t.valor, 0);
-
-    if (totalDespesas > totalReceitas && !avisouDespesaRef.current) {
-      avisouDespesaRef.current = true;
-      notificacoesApi.criar({
-        titulo: '⚠️ Atenção aos gastos',
-        mensagem: 'Suas despesas estão maiores que suas receitas. Considere revisar seu orçamento.',
-        tipo: 'alerta',
-      }).then(() => recarregar());
-    } else if (totalDespesas <= totalReceitas) {
-      avisouDespesaRef.current = false;
+    if (!usuario?.id) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metas, transacoes, carregando, usuario?.id]);
 
-  async function marcarLida(id: string) {
-    const ok = await notificacoesApi.marcarLida(id);
-    if (ok) await recarregar();
+
+    /*
+     * Ainda estamos carregando as notificações
+     * iniciais.
+     */
+    if (carregando) {
+      return;
+    }
+
+
+    /*
+     * Evita duas verificações simultâneas.
+     */
+    if (verificandoRef.current) {
+      return;
+    }
+
+
+    verificandoRef.current = true;
+
+
+    async function verificarNotificacoes() {
+
+      try {
+
+        /*
+         * ====================================================
+         * 1. METAS CONCLUÍDAS
+         * ====================================================
+         */
+
+        const metasConcluidas =
+          metas.filter(
+            (m: Meta) =>
+              m.atual >= m.total
+          );
+
+
+        for (
+          const meta of metasConcluidas
+        ) {
+
+          /*
+           * Chave permanente do evento.
+           *
+           * Exemplo:
+           *
+           * meta_concluida:550e8400-e29b-41d4-a716-446655440000
+           *
+           * Essa chave é o que impede a duplicação
+           * mesmo depois de fechar e abrir o aplicativo.
+           */
+          const chaveEvento =
+            `meta_concluida:${meta.id}`;
+
+
+          /*
+           * Se já verificamos essa meta nesta
+           * execução do aplicativo, não precisamos
+           * mandar outra requisição.
+           */
+          if (
+            metasAvisadasRef.current.has(
+              meta.id
+            )
+          ) {
+            continue;
+          }
+
+
+          console.log(
+            '🔔 Verificando meta concluída:',
+            meta.titulo
+          );
+
+
+          const criada =
+            await notificacoesApi.criar({
+
+              titulo:
+                '🎉 Meta concluída!',
+
+              mensagem:
+                `Parabéns! Você alcançou a meta "${meta.titulo}".`,
+
+              tipo:
+                'meta',
+
+              chaveEvento,
+            });
+
+
+          if (criada) {
+
+            console.log(
+              '✅ Notificação de meta processada:',
+              meta.titulo
+            );
+
+
+            metasAvisadasRef.current.add(
+              meta.id
+            );
+          }
+
+        }
+
+
+        /*
+         * ====================================================
+         * 2. DESPESAS MAIORES QUE RECEITAS
+         * ====================================================
+         */
+
+        const totalReceitas =
+          transacoes
+            .filter(
+              (t: Transacao) =>
+                t.tipo === 'receita'
+            )
+            .reduce(
+              (acc, t) =>
+                acc + t.valor,
+              0
+            );
+
+
+        const totalDespesas =
+          transacoes
+            .filter(
+              (t: Transacao) =>
+                t.tipo === 'despesa'
+            )
+            .reduce(
+              (acc, t) =>
+                acc + t.valor,
+              0
+            );
+
+
+        if (
+          totalDespesas >
+            totalReceitas &&
+          !avisouDespesaRef.current
+        ) {
+
+          console.log(
+            '⚠️ Criando alerta de despesas...'
+          );
+
+
+          const criada =
+            await notificacoesApi.criar({
+
+              titulo:
+                '⚠️ Atenção aos gastos',
+
+              mensagem:
+                'Suas despesas estão maiores que suas receitas. Considere revisar seu orçamento.',
+
+              tipo:
+                'alerta',
+            });
+
+
+          if (criada) {
+
+            avisouDespesaRef.current =
+              true;
+
+          }
+
+        }
+
+
+        /*
+         * Se a situação voltar ao normal,
+         * permitimos um novo alerta futuramente.
+         */
+        else if (
+          totalDespesas <=
+          totalReceitas
+        ) {
+
+          avisouDespesaRef.current =
+            false;
+
+        }
+
+      } catch (error) {
+
+        console.error(
+          'Erro ao verificar notificações automáticas:',
+          error
+        );
+
+      } finally {
+
+        verificandoRef.current =
+          false;
+
+      }
+
+
+      /*
+       * Atualiza a lista depois de verificar
+       * as notificações automáticas.
+       */
+      await recarregar();
+
+    }
+
+
+    verificarNotificacoes();
+
+  }, [
+    metas,
+    transacoes,
+    carregando,
+    usuario?.id,
+    recarregar,
+  ]);
+
+
+  /*
+   * Marca uma notificação como lida.
+   */
+  async function marcarLida(
+    id: string
+  ) {
+
+    const ok =
+      await notificacoesApi.marcarLida(
+        id
+      );
+
+
+    if (ok) {
+      await recarregar();
+    }
   }
 
+
+  /*
+   * Marca todas as notificações como lidas.
+   */
   async function marcarTodasLidas() {
-    const ok = await notificacoesApi.marcarTodasLidas();
-    if (ok) await recarregar();
+
+    const ok =
+      await notificacoesApi.marcarTodasLidas();
+
+
+    if (ok) {
+      await recarregar();
+    }
   }
 
-  async function excluir(id: string) {
-    const ok = await notificacoesApi.excluir(id);
-    if (ok) await recarregar();
+
+  /*
+   * Exclui uma notificação.
+   */
+  async function excluir(
+    id: string
+  ) {
+
+    const ok =
+      await notificacoesApi.excluir(
+        id
+      );
+
+
+    if (ok) {
+      await recarregar();
+    }
   }
 
-  const naoLidas = notificacoes.filter((n) => !n.lida).length;
+
+  /*
+   * Conta quantas notificações ainda
+   * não foram lidas.
+   */
+  const naoLidas =
+    notificacoes.filter(
+      (n) => !n.lida
+    ).length;
+
 
   return (
     <NotificacoesContexto.Provider

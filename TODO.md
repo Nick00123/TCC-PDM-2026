@@ -50,5 +50,5 @@
 
 
 ## 6. Ajustes
- - [] Ta tendo um problema de repetição no notificação, por exemplo, quando eu entro com a minha conta no app no notificação aparece uma mensagem de conclusão de metas, so que se eu sair do app e entrar novamente logando a minha conta novamente aparece a mesma mensagem so que repetida, num é tanto alguns testes, tem a mesma notificação de 1d, 1d e 3min atras, o que n deveria acontecer.
+ - [x] Ta tendo um problema de repetição no notificação, por exemplo, quando eu entro com a minha conta no app no notificação aparece uma mensagem de conclusão de metas, so que se eu sair do app e entrar novamente logando a minha conta novamente aparece a mesma mensagem so que repetida, num é tanto alguns testes, tem a mesma notificação de 1d, 1d e 3min atras, o que n deveria acontecer.
  - [] Agora na parte de perfil, no termos de uso e Politica de privacidade não tem nada e nem backup na Nuvem (eu gostaria de trocar essa parte por outra coisa, não me parece algo interessante em um app de financia ter uma backup aqui), nas perguntas Freauentes, só é uma caixa de texto, no feedback, poderia trocar esses emojis por icones da biblioteca que já está instaldada, o mesmo vale para o emoji de estrela do 'EduFinance v1.0'
