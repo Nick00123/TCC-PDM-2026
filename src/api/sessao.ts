@@ -170,3 +170,73 @@ export async function headersAutenticados(): Promise<Record<string, string>> {
     Authorization: `Bearer ${sessao.accessToken}`,
   };
 }
+
+export function diagnosticarErroJwt(
+  resposta: Response,
+  corpoErro: string,
+  authorization: string
+): void {
+  const erroNormalizado = corpoErro.toLowerCase();
+
+  if (
+    !erroNormalizado.includes('pgrst303') &&
+    !erroNormalizado.includes('jwt issued at future')
+  ) {
+    return;
+  }
+
+  let sub: string | number = 'indisponível';
+  let iat: number | null = null;
+  let exp: number | null = null;
+
+  try {
+    const token = authorization.replace(/^Bearer\s+/i, '');
+    const payloadBase64Url = token.split('.')[1];
+
+    if (payloadBase64Url) {
+      const payloadBase64 = payloadBase64Url
+        .replace(/-/g, '+')
+        .replace(/_/g, '/')
+        .padEnd(Math.ceil(payloadBase64Url.length / 4) * 4, '=');
+      const payloadBinario = globalThis.atob(payloadBase64);
+      const payloadTexto = decodeURIComponent(
+        Array.from(payloadBinario)
+          .map((caractere) =>
+            `%${caractere.charCodeAt(0).toString(16).padStart(2, '0')}`
+          )
+          .join('')
+      );
+      const payload = JSON.parse(payloadTexto);
+
+      if (typeof payload.sub === 'string' || typeof payload.sub === 'number') {
+        sub = payload.sub;
+      }
+      if (typeof payload.iat === 'number') iat = payload.iat;
+      if (typeof payload.exp === 'number') exp = payload.exp;
+    }
+  } catch {
+    // O diagnóstico continua sem expor o token quando o payload é inválido.
+  }
+
+  const agoraCliente = Math.floor(Date.now() / 1000);
+  const dataServidor = resposta.headers.get('Date');
+  const horarioServidor = dataServidor
+    ? Math.floor(Date.parse(dataServidor) / 1000)
+    : null;
+
+  console.warn('DIAGNÓSTICO JWT', {
+    sub,
+    iat: iat ?? 'indisponível',
+    exp: exp ?? 'indisponível',
+    agoraCliente,
+    dataServidor: dataServidor ?? 'indisponível',
+    iatAdiantadoClienteSegundos:
+      iat === null ? 'indisponível' : iat - agoraCliente,
+    iatAdiantadoServidorSegundos:
+      iat === null || horarioServidor === null || Number.isNaN(horarioServidor)
+        ? 'indisponível'
+        : iat - horarioServidor,
+    validadeJwtSegundos:
+      iat === null || exp === null ? 'indisponível' : exp - iat,
+  });
+}

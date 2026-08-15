@@ -1,6 +1,7 @@
 import type { Meta } from '../tipos';
 import { formatarMoeda } from '../utils/formatacao';
 import {
+  diagnosticarErroJwt,
   endpointRest,
   headersAutenticados,
   obterUsuarioDaSessao,
@@ -39,15 +40,18 @@ export const metasApi = {
         };
       }
 
+      const headers = await headersAutenticados();
       const resposta = await fetch(
         endpointRest(
           `Metas?select=*&user_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`
         ),
-        { headers: await headersAutenticados() }
+        { headers }
       );
 
       if (!resposta.ok) {
-        console.error('Erro ao listar metas:', await resposta.text());
+        const corpoErro = await resposta.text();
+        diagnosticarErroJwt(resposta, corpoErro, headers.Authorization);
+        console.error('Erro ao listar metas:', corpoErro);
         return {
           dados: [],
           mensagem: 'Não foi possível carregar as metas. Tente novamente mais tarde.',

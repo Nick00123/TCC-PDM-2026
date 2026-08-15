@@ -59,7 +59,12 @@ export function NotificacoesProvider({
 }: Props) {
 
   const { usuario } = useAuth();
-  const { metas, transacoes } = useFinance();
+  const {
+    metas,
+    transacoes,
+    carregandoTransacoes,
+    erroTransacoes,
+  } = useFinance();
 
   const [
     notificacoes,
@@ -93,14 +98,6 @@ export function NotificacoesProvider({
    */
   const metasAvisadasRef =
     useRef<Set<string>>(new Set());
-
-
-  /*
-   * Controle da notificação de despesas maiores
-   * que receitas.
-   */
-  const avisouDespesaRef =
-    useRef(false);
 
 
   /*
@@ -179,8 +176,6 @@ export function NotificacoesProvider({
      * temporários da conta anterior.
      */
     metasAvisadasRef.current.clear();
-
-    avisouDespesaRef.current = false;
 
     verificandoRef.current = false;
 
@@ -267,6 +262,18 @@ export function NotificacoesProvider({
     if (carregando) {
       return;
     }
+
+
+    if (
+      carregandoTransacoes ||
+      erroTransacoes
+    ) {
+      return;
+    }
+
+
+    const usuarioIdVerificacao =
+      usuario.id;
 
 
     /*
@@ -399,11 +406,41 @@ export function NotificacoesProvider({
             );
 
 
+        const estadoSaldo =
+          await notificacoesApi.obterEstadoSaldoNegativo(
+            usuarioIdVerificacao
+          );
+
+
         if (
-          totalDespesas >
-            totalReceitas &&
-          !avisouDespesaRef.current
+          userIdRef.current !==
+            usuarioIdVerificacao ||
+          !estadoSaldo.sucesso
         ) {
+          return;
+        }
+
+
+        if (
+          totalDespesas > totalReceitas &&
+          !estadoSaldo.saldoNegativoDesde
+        ) {
+
+          const episodio =
+            await notificacoesApi.iniciarEpisodioSaldoNegativo(
+              usuarioIdVerificacao
+            );
+
+
+          if (
+            userIdRef.current !==
+              usuarioIdVerificacao ||
+            !episodio.sucesso ||
+            !episodio.saldoNegativoDesde
+          ) {
+            return;
+          }
+
 
           console.log(
             '⚠️ Criando alerta de despesas...'
@@ -411,40 +448,44 @@ export function NotificacoesProvider({
 
 
           const criada =
-            await notificacoesApi.criar({
+            await notificacoesApi.criar(
+              {
+                titulo:
+                  '⚠️ Atenção aos gastos',
 
-              titulo:
-                '⚠️ Atenção aos gastos',
+                mensagem:
+                  'Suas despesas estão maiores que suas receitas. Considere revisar seu orçamento.',
 
-              mensagem:
-                'Suas despesas estão maiores que suas receitas. Considere revisar seu orçamento.',
+                tipo:
+                  'alerta',
 
-              tipo:
-                'alerta',
-            });
+                chaveEvento:
+                  `saldo_negativo:${episodio.saldoNegativoDesde}`,
+              },
+              usuarioIdVerificacao
+            );
 
 
-          if (criada) {
-
-            avisouDespesaRef.current =
-              true;
-
+          if (
+            !criada &&
+            userIdRef.current ===
+              usuarioIdVerificacao
+          ) {
+            await notificacoesApi.encerrarEpisodioSaldoNegativo(
+              usuarioIdVerificacao,
+              episodio.saldoNegativoDesde
+            );
           }
 
-        }
-
-
-        /*
-         * Se a situação voltar ao normal,
-         * permitimos um novo alerta futuramente.
-         */
-        else if (
-          totalDespesas <=
-          totalReceitas
+        } else if (
+          totalDespesas <= totalReceitas &&
+          estadoSaldo.saldoNegativoDesde
         ) {
 
-          avisouDespesaRef.current =
-            false;
+          await notificacoesApi.encerrarEpisodioSaldoNegativo(
+            usuarioIdVerificacao,
+            estadoSaldo.saldoNegativoDesde
+          );
 
         }
 
@@ -478,6 +519,8 @@ export function NotificacoesProvider({
     metas,
     transacoes,
     carregando,
+    carregandoTransacoes,
+    erroTransacoes,
     usuario?.id,
     recarregar,
   ]);

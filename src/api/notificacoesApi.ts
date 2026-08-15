@@ -1,5 +1,6 @@
 import type { Notificacao } from '../tipos';
 import {
+  diagnosticarErroJwt,
   endpointRest,
   headersAutenticados,
   obterUsuarioDaSessao,
@@ -25,6 +26,11 @@ export type ResultadoListagemNotificacoes = {
   mensagem: string;
 };
 
+type ResultadoEstadoSaldoNegativo = {
+  sucesso: boolean;
+  saldoNegativoDesde: string | null;
+};
+
 export const notificacoesApi = {
 
   /**
@@ -35,20 +41,128 @@ export const notificacoesApi = {
     return usuario?.id ?? null;
   },
 
-  /**
-   * Lista as notificações do usuário.
-   */
-  async listar(usuarioId: string): Promise<ResultadoListagemNotificacoes> {
+  async obterEstadoSaldoNegativo(
+    usuarioId: string
+  ): Promise<ResultadoEstadoSaldoNegativo> {
     try {
       const resposta = await fetch(
         endpointRest(
-          `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`
+          `perfis?select=saldo_negativo_desde&id=eq.${encodeURIComponent(usuarioId)}`
         ),
         { headers: await headersAutenticados() }
       );
 
       if (!resposta.ok) {
-        console.error('Erro ao listar notificações:', await resposta.text());
+        console.error('Erro ao consultar episódio de saldo negativo:', await resposta.text());
+        return { sucesso: false, saldoNegativoDesde: null };
+      }
+
+      const perfis = (await resposta.json()) as {
+        saldo_negativo_desde: string | null;
+      }[];
+
+      if (!perfis[0]) {
+        return { sucesso: false, saldoNegativoDesde: null };
+      }
+
+      return {
+        sucesso: true,
+        saldoNegativoDesde: perfis[0].saldo_negativo_desde,
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao consultar episódio de saldo negativo:', error);
+      return { sucesso: false, saldoNegativoDesde: null };
+    }
+  },
+
+  async iniciarEpisodioSaldoNegativo(
+    usuarioId: string
+  ): Promise<ResultadoEstadoSaldoNegativo> {
+    const inicio = new Date().toISOString();
+
+    try {
+      const resposta = await fetch(
+        endpointRest(
+          `perfis?id=eq.${encodeURIComponent(usuarioId)}&saldo_negativo_desde=is.null`
+        ),
+        {
+          method: 'PATCH',
+          headers: {
+            ...(await headersAutenticados()),
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({ saldo_negativo_desde: inicio }),
+        }
+      );
+
+      if (!resposta.ok) {
+        console.error('Erro ao iniciar episódio de saldo negativo:', await resposta.text());
+        return { sucesso: false, saldoNegativoDesde: null };
+      }
+
+      const perfis = (await resposta.json()) as {
+        saldo_negativo_desde: string | null;
+      }[];
+
+      return {
+        sucesso: true,
+        saldoNegativoDesde: perfis[0]?.saldo_negativo_desde ?? null,
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao iniciar episódio de saldo negativo:', error);
+      return { sucesso: false, saldoNegativoDesde: null };
+    }
+  },
+
+  async encerrarEpisodioSaldoNegativo(
+    usuarioId: string,
+    episodioEsperado?: string
+  ): Promise<boolean> {
+    const filtroEpisodio = episodioEsperado
+      ? `&saldo_negativo_desde=eq.${encodeURIComponent(episodioEsperado)}`
+      : '&saldo_negativo_desde=not.is.null';
+
+    try {
+      const resposta = await fetch(
+        endpointRest(
+          `perfis?id=eq.${encodeURIComponent(usuarioId)}${filtroEpisodio}`
+        ),
+        {
+          method: 'PATCH',
+          headers: await headersAutenticados(),
+          body: JSON.stringify({ saldo_negativo_desde: null }),
+        }
+      );
+
+      if (!resposta.ok) {
+        console.error('Erro ao encerrar episódio de saldo negativo:', await resposta.text());
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Erro inesperado ao encerrar episódio de saldo negativo:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Lista as notificações do usuário.
+   */
+  async listar(usuarioId: string): Promise<ResultadoListagemNotificacoes> {
+    try {
+      const headers = await headersAutenticados();
+      const resposta = await fetch(
+        endpointRest(
+          `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`
+        ),
+        { headers }
+      );
+
+      if (!resposta.ok) {
+        const corpoErro = await resposta.text();
+        diagnosticarErroJwt(resposta, corpoErro, headers.Authorization);
+        console.error('Erro ao listar notificações:', corpoErro);
         return {
           dados: [],
           mensagem: 'Não foi possível carregar as notificações. Tente novamente mais tarde.',
@@ -86,7 +200,8 @@ export const notificacoesApi = {
    * que o mesmo evento não seja inserido duas vezes.
    */
   async criar(
-    nova: NovaNotificacao
+    nova: NovaNotificacao,
+    usuarioEsperado?: string
   ): Promise<boolean> {
 
     const usuarioId =
@@ -97,6 +212,10 @@ export const notificacoesApi = {
         'Erro ao criar notificação: usuário não autenticado.'
       );
 
+      return false;
+    }
+
+    if (usuarioEsperado && usuarioId !== usuarioEsperado) {
       return false;
     }
 
@@ -132,6 +251,7 @@ export const notificacoesApi = {
       console.error('Erro inesperado ao criar notificação:', error);
       return false;
     }
+
   },
 
   /**

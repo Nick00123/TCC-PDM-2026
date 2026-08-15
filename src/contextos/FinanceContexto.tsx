@@ -61,9 +61,8 @@ const usuarioId = usuario?.id ?? null;
     setCarregandoMetas(true);
     const resultado = await metasApi.listar();
     // Se o usuário mudou durante a busca, descarta o resultado e
-    // garante que o estado de carregamento não fique travado em `true`.
+    // não altera o carregamento que agora pertence à nova conta.
     if (userIdRef.current !== usuarioId) {
-      setCarregandoMetas(false);
       return;
     }
     if (resultado.mensagem) {
@@ -123,15 +122,18 @@ const usuarioId = usuario?.id ?? null;
   useEffect(() => {
     userIdRef.current = usuarioId;
     setTransacoes([]);
+    setMetas([]);
     setErroTransacoes(null);
+    setErroMetas(null);
 
     if (!usuarioId) {
       setCarregandoTransacoes(false);
-      setMetas([]);
-      setErroMetas(null);
       setCarregandoMetas(false);
       return;
     }
+
+    setCarregandoTransacoes(true);
+    setCarregandoMetas(true);
     carregarMetas();
     carregarTransacoes();
   }, [usuarioId, carregarMetas, carregarTransacoes]);
