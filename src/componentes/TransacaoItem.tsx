@@ -1,10 +1,8 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { formatarMoeda } from '../utils/formatacao';
 
 type Props = {
-  icone?: string | ReactNode;
   descricao: string;
   categoria: string;
   valor: number;

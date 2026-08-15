@@ -1,13 +1,15 @@
 import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryPie } from 'victory-native';
-import { useFinance } from '../contextos/FinanceContexto';
 import type { Transacao } from '../tipos';
 
 const CORES = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 
-export default function GastosPorCategoria() {
-  const { transacoes } = useFinance();
+type Props = {
+  transacoes: Transacao[];
+};
+
+export default function GastosPorCategoria({ transacoes }: Props) {
   const { width } = useWindowDimensions();
 
   // Tamanho do donut dimensionado conforme a tela (metade da largura disponível)

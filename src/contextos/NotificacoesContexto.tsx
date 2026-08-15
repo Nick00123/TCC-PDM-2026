@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 
 import { notificacoesApi } from '../api/notificacoesApi';
+import type { ResultadoNotificacao } from '../api/notificacoesApi';
 
 import type {
   Meta,
@@ -17,24 +18,24 @@ import type {
 } from '../tipos';
 
 import { useAuth } from './AuthContexto';
+import { useFinance } from './FinanceContexto';
 
 
 type NotificacoesContextoType = {
   notificacoes: Notificacao[];
   naoLidas: number;
   carregando: boolean;
-
-  recarregar: () => Promise<void>;
+  erro: string | null;
 
   marcarLida: (
     id: string
-  ) => Promise<void>;
+  ) => Promise<ResultadoNotificacao>;
 
-  marcarTodasLidas: () => Promise<void>;
+  marcarTodasLidas: () => Promise<ResultadoNotificacao>;
 
   excluir: (
     id: string
-  ) => Promise<void>;
+  ) => Promise<ResultadoNotificacao>;
 };
 
 
@@ -50,18 +51,15 @@ export const useNotificacoes =
 
 type Props = {
   children: ReactNode;
-  metas: Meta[];
-  transacoes: Transacao[];
 };
 
 
 export function NotificacoesProvider({
   children,
-  metas,
-  transacoes,
 }: Props) {
 
   const { usuario } = useAuth();
+  const { metas, transacoes } = useFinance();
 
   const [
     notificacoes,
@@ -72,6 +70,8 @@ export function NotificacoesProvider({
     carregando,
     setCarregando,
   ] = useState(true);
+
+  const [erro, setErro] = useState<string | null>(null);
 
 
   /*
@@ -131,8 +131,10 @@ export function NotificacoesProvider({
       }
 
 
-      const lista =
-        await notificacoesApi.listar();
+      const resultado =
+        await notificacoesApi.listar(
+          usuarioAtual
+        );
 
 
       /*
@@ -146,7 +148,12 @@ export function NotificacoesProvider({
       }
 
 
-      setNotificacoes(lista);
+      if (resultado.mensagem) {
+        setErro(resultado.mensagem);
+      } else {
+        setNotificacoes(resultado.dados);
+        setErro(null);
+      }
 
     },
     [usuario?.id]
@@ -178,14 +185,21 @@ export function NotificacoesProvider({
     verificandoRef.current = false;
 
 
-    if (!usuarioId) {
+    setNotificacoes([]);
 
-      setNotificacoes([]);
+    setErro(null);
+
+
+    if (!usuarioId) {
 
       setCarregando(false);
 
       return;
     }
+
+
+    const usuarioAutenticado =
+      usuarioId;
 
 
     let ativo = true;
@@ -196,8 +210,10 @@ export function NotificacoesProvider({
 
     async function carregar() {
 
-      const lista =
-        await notificacoesApi.listar();
+      const resultado =
+        await notificacoesApi.listar(
+          usuarioAutenticado
+        );
 
 
       if (!ativo) {
@@ -206,13 +222,19 @@ export function NotificacoesProvider({
 
 
       if (
-        userIdRef.current !== usuarioId
+        userIdRef.current !==
+          usuarioAutenticado
       ) {
         return;
       }
 
 
-      setNotificacoes(lista);
+      if (resultado.mensagem) {
+        setErro(resultado.mensagem);
+      } else {
+        setNotificacoes(resultado.dados);
+        setErro(null);
+      }
 
       setCarregando(false);
     }
@@ -468,15 +490,17 @@ export function NotificacoesProvider({
     id: string
   ) {
 
-    const ok =
+    const resultado =
       await notificacoesApi.marcarLida(
         id
       );
 
 
-    if (ok) {
+    if (resultado.sucesso) {
       await recarregar();
     }
+
+    return resultado;
   }
 
 
@@ -485,13 +509,15 @@ export function NotificacoesProvider({
    */
   async function marcarTodasLidas() {
 
-    const ok =
+    const resultado =
       await notificacoesApi.marcarTodasLidas();
 
 
-    if (ok) {
+    if (resultado.sucesso) {
       await recarregar();
     }
+
+    return resultado;
   }
 
 
@@ -502,15 +528,17 @@ export function NotificacoesProvider({
     id: string
   ) {
 
-    const ok =
+    const resultado =
       await notificacoesApi.excluir(
         id
       );
 
 
-    if (ok) {
+    if (resultado.sucesso) {
       await recarregar();
     }
+
+    return resultado;
   }
 
 
@@ -518,8 +546,31 @@ export function NotificacoesProvider({
    * Conta quantas notificações ainda
    * não foram lidas.
    */
+  const usuarioAtualId =
+    usuario?.id ?? null;
+
+
+  const usuarioMudou =
+    userIdRef.current !== usuarioAtualId;
+
+
+  const notificacoesDoUsuarioAtual =
+    !usuarioMudou
+      ? notificacoes
+      : [];
+
+
+  const carregandoUsuarioAtual =
+    Boolean(usuarioAtualId) &&
+    (usuarioMudou || carregando);
+
+
+  const erroUsuarioAtual =
+    usuarioMudou ? null : erro;
+
+
   const naoLidas =
-    notificacoes.filter(
+    notificacoesDoUsuarioAtual.filter(
       (n) => !n.lida
     ).length;
 
@@ -527,10 +578,13 @@ export function NotificacoesProvider({
   return (
     <NotificacoesContexto.Provider
       value={{
-        notificacoes,
+        notificacoes:
+          notificacoesDoUsuarioAtual,
         naoLidas,
-        carregando,
-        recarregar,
+        carregando:
+          carregandoUsuarioAtual,
+        erro:
+          erroUsuarioAtual,
         marcarLida,
         marcarTodasLidas,
         excluir,

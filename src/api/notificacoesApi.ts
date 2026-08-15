@@ -1,5 +1,9 @@
 import type { Notificacao } from '../tipos';
-import { supabase } from './supabaseCliente';
+import {
+  endpointRest,
+  headersAutenticados,
+  obterUsuarioDaSessao,
+} from './sessao';
 
 type NovaNotificacao = {
   titulo: string;
@@ -11,59 +15,68 @@ type NovaNotificacao = {
   chaveEvento?: string;
 };
 
+export type ResultadoNotificacao = {
+  sucesso: boolean;
+  mensagem: string;
+};
+
+export type ResultadoListagemNotificacoes = {
+  dados: Notificacao[];
+  mensagem: string;
+};
+
 export const notificacoesApi = {
 
   /**
    * Retorna o id do usuário autenticado.
    */
   async usuarioAutenticado(): Promise<string | null> {
-    const { data, error } = await supabase.auth.getUser();
-
-    if (error) {
-      console.error(
-        'Erro ao obter usuário autenticado:',
-        error
-      );
-
-      return null;
-    }
-
-    return data.user?.id ?? null;
+    const usuario = await obterUsuarioDaSessao();
+    return usuario?.id ?? null;
   },
 
   /**
    * Lista as notificações do usuário.
    */
-  async listar(): Promise<Notificacao[]> {
-    const { data, error } = await supabase
-      .from('notificacoes')
-      .select('*')
-      .order('criada_em', {
-        ascending: false,
-      })
-      .limit(50);
-
-    if (error) {
-      console.error(
-        'Erro ao listar notificações:',
-        error
+  async listar(usuarioId: string): Promise<ResultadoListagemNotificacoes> {
+    try {
+      const resposta = await fetch(
+        endpointRest(
+          `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`
+        ),
+        { headers: await headersAutenticados() }
       );
 
-      return [];
-    }
+      if (!resposta.ok) {
+        console.error('Erro ao listar notificações:', await resposta.text());
+        return {
+          dados: [],
+          mensagem: 'Não foi possível carregar as notificações. Tente novamente mais tarde.',
+        };
+      }
 
-    return (
-      data?.map(
-        (item: any): Notificacao => ({
-          id: item.id,
-          titulo: item.titulo,
-          mensagem: item.mensagem,
-          tipo: item.tipo,
-          lida: item.lida,
-          criadaEm: item.criada_em,
-        })
-      ) ?? []
-    );
+      const dados = (await resposta.json()) as any[];
+
+      return {
+        dados: dados.map(
+          (item: any): Notificacao => ({
+            id: item.id,
+            titulo: item.titulo,
+            mensagem: item.mensagem,
+            tipo: item.tipo,
+            lida: item.lida,
+            criadaEm: item.criada_em,
+          })
+        ),
+        mensagem: '',
+      };
+    } catch (error) {
+      console.error('Erro inesperado ao listar notificações:', error);
+      return {
+        dados: [],
+        mensagem: 'Não foi possível carregar as notificações. Tente novamente mais tarde.',
+      };
+    }
   },
 
   /**
@@ -96,75 +109,29 @@ export const notificacoesApi = {
       chave_evento: nova.chaveEvento ?? null,
     };
 
-    const { error } = await supabase
-      .from('notificacoes')
-      .upsert(
-        registro,
+    try {
+      const resposta = await fetch(
+        endpointRest('notificacoes?on_conflict=usuario_id,chave_evento'),
         {
-          onConflict: 'usuario_id,chave_evento',
-          ignoreDuplicates: true,
+          method: 'POST',
+          headers: {
+            ...(await headersAutenticados()),
+            Prefer: 'resolution=ignore-duplicates,return=minimal',
+          },
+          body: JSON.stringify(registro),
         }
       );
 
-    if (error) {
-      console.error(
-        'Erro ao criar notificação:',
-        error
-      );
+      if (!resposta.ok) {
+        console.error('Erro ao criar notificação:', await resposta.text());
+        return false;
+      }
 
+      return true;
+    } catch (error) {
+      console.error('Erro inesperado ao criar notificação:', error);
       return false;
     }
-
-    return true;
-  },
-
-  /**
-   * Cria várias notificações de uma vez.
-   */
-  async criarVarias(
-    novas: NovaNotificacao[]
-  ): Promise<boolean> {
-
-    const usuarioId =
-      await this.usuarioAutenticado();
-
-    if (!usuarioId) {
-      console.error(
-        'Erro ao criar notificações: usuário não autenticado.'
-      );
-
-      return false;
-    }
-
-    const linhas = novas.map((n) => ({
-      usuario_id: usuarioId,
-      titulo: n.titulo,
-      mensagem: n.mensagem,
-      tipo: n.tipo,
-      lida: false,
-      chave_evento: n.chaveEvento ?? null,
-    }));
-
-    const { error } = await supabase
-      .from('notificacoes')
-      .upsert(
-        linhas,
-        {
-          onConflict: 'usuario_id,chave_evento',
-          ignoreDuplicates: true,
-        }
-      );
-
-    if (error) {
-      console.error(
-        'Erro ao criar notificações:',
-        error
-      );
-
-      return false;
-    }
-
-    return true;
   },
 
   /**
@@ -172,25 +139,45 @@ export const notificacoesApi = {
    */
   async marcarLida(
     id: string
-  ): Promise<boolean> {
+  ): Promise<ResultadoNotificacao> {
 
-    const { error } = await supabase
-      .from('notificacoes')
-      .update({
-        lida: true,
-      })
-      .eq('id', id);
+    try {
+      const usuarioId = await this.usuarioAutenticado();
 
-    if (error) {
-      console.error(
-        'Erro ao marcar notificação como lida:',
-        error
+      if (!usuarioId) {
+        return {
+          sucesso: false,
+          mensagem: 'Você precisa estar autenticado para alterar a notificação.',
+        };
+      }
+
+      const resposta = await fetch(
+        endpointRest(
+          `notificacoes?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`
+        ),
+        {
+          method: 'PATCH',
+          headers: await headersAutenticados(),
+          body: JSON.stringify({ lida: true }),
+        }
       );
 
-      return false;
-    }
+      if (!resposta.ok) {
+        console.error('Erro ao marcar notificação como lida:', await resposta.text());
+        return {
+          sucesso: false,
+          mensagem: 'Não foi possível marcar a notificação como lida.',
+        };
+      }
 
-    return true;
+      return { sucesso: true, mensagem: '' };
+    } catch (error) {
+      console.error('Erro inesperado ao marcar notificação como lida:', error);
+      return {
+        sucesso: false,
+        mensagem: 'Não foi possível marcar a notificação como lida.',
+      };
+    }
   },
 
   /**
@@ -199,25 +186,45 @@ export const notificacoesApi = {
    * O RLS garante que somente as notificações
    * do usuário autenticado sejam alteradas.
    */
-  async marcarTodasLidas(): Promise<boolean> {
+  async marcarTodasLidas(): Promise<ResultadoNotificacao> {
 
-    const { error } = await supabase
-      .from('notificacoes')
-      .update({
-        lida: true,
-      })
-      .eq('lida', false);
+    try {
+      const usuarioId = await this.usuarioAutenticado();
 
-    if (error) {
-      console.error(
-        'Erro ao marcar todas como lidas:',
-        error
+      if (!usuarioId) {
+        return {
+          sucesso: false,
+          mensagem: 'Você precisa estar autenticado para alterar as notificações.',
+        };
+      }
+
+      const resposta = await fetch(
+        endpointRest(
+          `notificacoes?lida=eq.false&usuario_id=eq.${encodeURIComponent(usuarioId)}`
+        ),
+        {
+          method: 'PATCH',
+          headers: await headersAutenticados(),
+          body: JSON.stringify({ lida: true }),
+        }
       );
 
-      return false;
-    }
+      if (!resposta.ok) {
+        console.error('Erro ao marcar todas como lidas:', await resposta.text());
+        return {
+          sucesso: false,
+          mensagem: 'Não foi possível marcar todas as notificações como lidas.',
+        };
+      }
 
-    return true;
+      return { sucesso: true, mensagem: '' };
+    } catch (error) {
+      console.error('Erro inesperado ao marcar todas como lidas:', error);
+      return {
+        sucesso: false,
+        mensagem: 'Não foi possível marcar todas as notificações como lidas.',
+      };
+    }
   },
 
   /**
@@ -225,22 +232,43 @@ export const notificacoesApi = {
    */
   async excluir(
     id: string
-  ): Promise<boolean> {
+  ): Promise<ResultadoNotificacao> {
 
-    const { error } = await supabase
-      .from('notificacoes')
-      .delete()
-      .eq('id', id);
+    try {
+      const usuarioId = await this.usuarioAutenticado();
 
-    if (error) {
-      console.error(
-        'Erro ao excluir notificação:',
-        error
+      if (!usuarioId) {
+        return {
+          sucesso: false,
+          mensagem: 'Você precisa estar autenticado para excluir a notificação.',
+        };
+      }
+
+      const resposta = await fetch(
+        endpointRest(
+          `notificacoes?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`
+        ),
+        {
+          method: 'DELETE',
+          headers: await headersAutenticados(),
+        }
       );
 
-      return false;
-    }
+      if (!resposta.ok) {
+        console.error('Erro ao excluir notificação:', await resposta.text());
+        return {
+          sucesso: false,
+          mensagem: 'Não foi possível excluir a notificação.',
+        };
+      }
 
-    return true;
+      return { sucesso: true, mensagem: '' };
+    } catch (error) {
+      console.error('Erro inesperado ao excluir notificação:', error);
+      return {
+        sucesso: false,
+        mensagem: 'Não foi possível excluir a notificação.',
+      };
+    }
   },
 };

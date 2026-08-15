@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryGroup, VictoryTheme } from 'victory-native';
-import { useFinance } from '../contextos/FinanceContexto';
 import type { Transacao } from '../tipos';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -10,19 +9,34 @@ const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
 const COR_RECEITA = '#1a9e75';
 const COR_DESPESA = '#e24b4a';
 
-export default function EvolucaoMensal() {
+type Props = {
+  transacoes: Transacao[];
+};
+
+export default function EvolucaoMensal({ transacoes }: Props) {
   const { width } = useWindowDimensions();
   const largura = width - 64;
-  const { transacoes } = useFinance();
   const [semestre, setSemestre] = useState<1 | 2>(1);
+  const anoAtual = new Date().getFullYear();
+
+  const transacoesDoAno = transacoes.filter((transacao) => {
+    const [ano] = transacao.data.split('-').map(Number);
+    return ano === anoAtual;
+  });
 
   const dados = MESES.map((label, i) => {
-    const receita = transacoes
-      .filter((t: Transacao) => t.tipo === 'receita' && new Date(t.data).getMonth() === i)
+    const receita = transacoesDoAno
+      .filter((t: Transacao) => {
+        const mes = Number(t.data.split('-')[1]) - 1;
+        return t.tipo === 'receita' && mes === i;
+      })
       .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
 
-    const despesa = transacoes
-      .filter((t: Transacao) => t.tipo === 'despesa' && new Date(t.data).getMonth() === i)
+    const despesa = transacoesDoAno
+      .filter((t: Transacao) => {
+        const mes = Number(t.data.split('-')[1]) - 1;
+        return t.tipo === 'despesa' && mes === i;
+      })
       .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
 
     return { x: i + 1, mes: label, receita, despesa };

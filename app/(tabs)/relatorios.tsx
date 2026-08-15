@@ -25,7 +25,8 @@ import {
   VictoryPie,
   VictoryTheme,
 } from 'victory-native';
-import { Meta, Transacao, useFinance } from '../_layout';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+import type { Transacao } from '../../src/tipos';
 
 type Aba = 'geral' | 'categorias' | 'tendencias';
 
@@ -40,9 +41,9 @@ const formatarEixoY = (valor: number) => {
   return `R$${Math.round(valor)}`;
 };
 
-const parseData = (data: string) => {
-  const [year, month, day] = data.split('-').map(Number);
-  return new Date(year, month - 1, day);
+const obterAnoMes = (data: string) => {
+  const [ano, mes] = data.split('-').map(Number);
+  return { ano, mes: mes - 1 };
 };
 
 // Estilos corrigidos para evitar sobreposição de eixos no Victory
@@ -61,11 +62,11 @@ const estiloEixoY = {
 };
 
 export default function Relatorios() {
-  const { transacoes, metas } = useFinance();
+  const { transacoes, carregandoTransacoes, erroTransacoes } = useFinance();
   const [aba, setAba] = useState<Aba>('geral');
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const [mesSelecionado, setMesSelecionado] = useState<number>(new Date().getMonth());
-  const [anoSelecionado] = useState<number>(new Date().getFullYear());
+  const anoSelecionado = new Date().getFullYear();
   
   // Estado para controlar o Modal Customizado do Calendário
   const [modalVisible, setModalVisible] = useState(false);
@@ -74,9 +75,14 @@ export default function Relatorios() {
   // Ajuste do padding do container para evitar corte nas bordas do celular
   const larguraGrafico = width - 70;
 
-  const transacoesFiltradas = transacoes.filter((t: Transacao) => {
-    const d = parseData(t.data);
-    return d.getMonth() === mesSelecionado && d.getFullYear() === anoSelecionado;
+  const transacoesDoAno = transacoes.filter((t: Transacao) => {
+    const { ano } = obterAnoMes(t.data);
+    return ano === anoSelecionado;
+  });
+
+  const transacoesFiltradas = transacoesDoAno.filter((t: Transacao) => {
+    const { mes } = obterAnoMes(t.data);
+    return mes === mesSelecionado;
   });
 
   const totalReceitas = transacoesFiltradas
@@ -93,11 +99,11 @@ export default function Relatorios() {
     : '0.0';
 
   const dadosMeses = MESES.map((label, i) => {
-    const receita = transacoes
-      .filter((t: Transacao) => t.tipo === 'receita' && parseData(t.data).getMonth() === i)
+    const receita = transacoesDoAno
+      .filter((t: Transacao) => t.tipo === 'receita' && obterAnoMes(t.data).mes === i)
       .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
-    const despesa = transacoes
-      .filter((t: Transacao) => t.tipo === 'despesa' && parseData(t.data).getMonth() === i)
+    const despesa = transacoesDoAno
+      .filter((t: Transacao) => t.tipo === 'despesa' && obterAnoMes(t.data).mes === i)
       .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
     return { x: i + 1, mes: label, receita, despesa, economia: receita - despesa };
   });
@@ -121,8 +127,6 @@ export default function Relatorios() {
   }));
   const temCateg = dadosPie.length > 0;
 
-  const totalMeta = metas.reduce((acc: number, m: Meta) => acc + m.total, 0);
-
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* ── HEADER ── */}
@@ -142,6 +146,12 @@ export default function Relatorios() {
         </TouchableOpacity>
       </View>
 
+      {carregandoTransacoes ? (
+        <Text style={styles.estadoDados}>Carregando dados financeiros...</Text>
+      ) : erroTransacoes ? (
+        <Text style={styles.estadoDados}>Relatórios indisponíveis no momento.</Text>
+      ) : (
+        <>
       {/* ── GRID DE SUMÁRIO ── */}
       <View style={styles.grid}>
         <View style={styles.card}>
@@ -343,7 +353,7 @@ export default function Relatorios() {
             width={larguraGrafico}
             height={220}
             theme={VictoryTheme.material}
-            domain={{ y: [-maxEcon, Math.max(maxEcon, totalMeta > 0 ? totalMeta * 1.1 : 0)] }}
+            domain={{ y: [-maxEcon, maxEcon] }}
             padding={{ top: 10, bottom: 30, left: 45, right: 15 }}
           >
             <VictoryAxis
@@ -360,6 +370,8 @@ export default function Relatorios() {
             />
           </VictoryChart>
         </View>
+      )}
+        </>
       )}
 
       {/* ── MODAL CUSTOMIZADO DO CALENDÁRIO ── */}
@@ -406,6 +418,13 @@ export default function Relatorios() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAF9' },
+  estadoDados: {
+    color: '#64748B',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 40,
+  },
 
   header: {
     backgroundColor: '#FFFFFF',

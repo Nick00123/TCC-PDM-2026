@@ -2,8 +2,15 @@ import { useRouter } from 'expo-router';
 import { ChevronRight, FileText, HelpCircle, LogOut, Send, Shield, Target } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { CategoriaFeedback, feedbackApi } from '../../src/api/feedbackApi';
-import { useAuth, useFinance } from '../_layout';
+import {
+  endpointRest,
+  headersAutenticados,
+  obterUsuarioDaSessao,
+} from '../../src/api/sessao';
+import { useAuth } from '../../src/contextos/AuthContexto';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+
+type CategoriaFeedback = 'sugestao' | 'bug' | 'elogio';
 
 const CATEGORIAS_FEEDBACK: { chave: CategoriaFeedback; label: string }[] = [
   { chave: 'sugestao', label: '💡 Sugestão' },
@@ -12,7 +19,7 @@ const CATEGORIAS_FEEDBACK: { chave: CategoriaFeedback; label: string }[] = [
 ];
 
 export default function Perfil() {
-  const { totalReceitas, totalDespesas } = useFinance();
+  const { totalReceitas, totalDespesas, carregandoTransacoes, erroTransacoes } = useFinance();
   const { usuario, logout } = useAuth();
   const [temaEscuro, setTemaEscuro] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -30,15 +37,41 @@ export default function Perfil() {
       return;
     }
     setEnviandoFeedback(true);
-    const resultado = await feedbackApi.enviar(texto, categoriaFeedback);
-    setEnviandoFeedback(false);
 
-    if (resultado.sucesso) {
+    try {
+      const usuario = await obterUsuarioDaSessao();
+
+      if (!usuario) {
+        Alert.alert('Ops', 'Você precisa estar logado para enviar feedback.');
+        return;
+      }
+
+      const resposta = await fetch(endpointRest('feedback'), {
+        method: 'POST',
+        headers: await headersAutenticados(),
+        body: JSON.stringify({
+          usuario_id: usuario.id,
+          mensagem: texto,
+          categoria: categoriaFeedback,
+        }),
+      });
+
+      if (!resposta.ok) {
+        console.error('Erro ao enviar feedback:', await resposta.text());
+        Alert.alert('Ops', 'Não foi possível enviar. Tente novamente.');
+        return;
+      }
+
       setFeedback('');
       setFeedbackEnviado(true);
       setTimeout(() => setFeedbackEnviado(false), 4000);
+      Alert.alert('Sucesso', 'Feedback enviado! Obrigado pela contribuição.');
+    } catch (error) {
+      console.error('Erro inesperado ao enviar feedback:', error);
+      Alert.alert('Ops', 'Não foi possível enviar. Tente novamente.');
+    } finally {
+      setEnviandoFeedback(false);
     }
-    Alert.alert(resultado.sucesso ? 'Sucesso' : 'Ops', resultado.mensagem);
   };
 
   const theme = {
@@ -68,15 +101,23 @@ export default function Perfil() {
 
       {/* Resumo financeiro */}
       <View style={[styles.resumo, { backgroundColor: theme.card }]}>
-        <View style={styles.resumoItem}>
-          <Text style={[styles.resumoValor, { color: '#1A9E75' }]}>R$ {totalReceitas.toFixed(2)}</Text>
-          <Text style={[styles.resumoLabel, { color: theme.subText }]}>Receitas</Text>
-        </View>
-        <View style={styles.divisor} />
-        <View style={styles.resumoItem}>
-          <Text style={[styles.resumoValor, { color: '#F44336' }]}>R$ {totalDespesas.toFixed(2)}</Text>
-          <Text style={[styles.resumoLabel, { color: theme.subText }]}>Despesas</Text>
-        </View>
+        {carregandoTransacoes || erroTransacoes ? (
+          <Text style={styles.resumoEstado}>
+            {carregandoTransacoes ? 'Carregando resumo...' : 'Resumo indisponível'}
+          </Text>
+        ) : (
+          <>
+            <View style={styles.resumoItem}>
+              <Text style={[styles.resumoValor, { color: '#1A9E75' }]}>R$ {totalReceitas.toFixed(2)}</Text>
+              <Text style={[styles.resumoLabel, { color: theme.subText }]}>Receitas</Text>
+            </View>
+            <View style={styles.divisor} />
+            <View style={styles.resumoItem}>
+              <Text style={[styles.resumoValor, { color: '#F44336' }]}>R$ {totalDespesas.toFixed(2)}</Text>
+              <Text style={[styles.resumoLabel, { color: theme.subText }]}>Despesas</Text>
+            </View>
+          </>
+        )}
       </View>
 
       {/* Configurações */}
@@ -257,6 +298,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   resumoItem: { flex: 1, alignItems: 'center' },
+  resumoEstado: { flex: 1, color: '#64748B', textAlign: 'center' },
   resumoValor: { fontSize: 18, fontWeight: 'bold', color: '#1A9E75' },
   resumoLabel: { fontSize: 12, color: '#888', marginTop: 4 },
   divisor: { width: 1, backgroundColor: '#F0F0F0' },

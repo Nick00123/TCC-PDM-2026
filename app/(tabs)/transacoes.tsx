@@ -1,8 +1,9 @@
 import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2, X } from 'lucide-react-native';
 import React, { useState } from 'react';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+import type { Transacao } from '../../src/tipos';
 import { corDaCategoria, formatarData, normalizarData } from '../../src/utils/formatacao';
-import { Transacao, useFinance } from '../_layout';
 
 type Filtro = 'todos' | 'receitas' | 'despesas';
 type TipoModal = 'receita' | 'despesa' | null;
@@ -10,8 +11,28 @@ type TipoModal = 'receita' | 'despesa' | null;
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
 
+function dataValida(data: string) {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
+  if (!partes) return false;
+
+  const ano = Number(partes[1]);
+  const mes = Number(partes[2]);
+  const dia = Number(partes[3]);
+  const dataCriada = new Date(ano, mes - 1, dia);
+
+  return dataCriada.getFullYear() === ano
+    && dataCriada.getMonth() === mes - 1
+    && dataCriada.getDate() === dia;
+}
+
 export default function Transacoes() {
-  const { transacoes, adicionarTransacao, removerTransacao } = useFinance();
+  const {
+    transacoes,
+    carregandoTransacoes,
+    erroTransacoes,
+    adicionarTransacao,
+    removerTransacao,
+  } = useFinance();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busca, setBusca] = useState('');
   const [modalTipo, setModalTipo] = useState<TipoModal>(null);
@@ -19,7 +40,9 @@ export default function Transacoes() {
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
-const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+  const [salvando, setSalvando] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   const transacoesFiltradas = transacoes
     .filter((t: Transacao) => {
@@ -76,23 +99,76 @@ const [data, setData] = useState(new Date().toISOString().split('T')[0]);
     setModalTipo(null);
   };
 
-  const salvar = () => {
-    if (!valor || !descricao || !categoria || !modalTipo) return;
+  const salvar = async () => {
+    if (salvando || !modalTipo) return;
+
+    if (!descricao.trim() || !categoria) {
+      Alert.alert('Campos obrigatórios', 'Preencha a descrição e escolha uma categoria.');
+      return;
+    }
+
+    const valorNumerico = Number(valor.trim().replace(',', '.'));
+    if (!valor.trim() || !Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
+      return;
+    }
 
     const dataFormatada = normalizarData(data);
-    const dataObj = new Date(dataFormatada);
-    if (isNaN(dataObj.getTime())) return;
-    
-adicionarTransacao({
-      descricao,
-      categoria,
-      valor: parseFloat(valor.replace(',', '.')),
-      data: dataFormatada,
-      tipo: modalTipo,
-      icone: modalTipo,
-    });
+    if (!dataValida(dataFormatada)) {
+      Alert.alert('Data inválida', 'Informe uma data válida no formato AAAA-MM-DD, DD/MM/AAAA ou DD-MM-AAAA.');
+      return;
+    }
 
-    limparForm();
+    setSalvando(true);
+    try {
+      const resultado = await adicionarTransacao({
+        descricao: descricao.trim(),
+        categoria,
+        valor: valorNumerico,
+        data: dataFormatada,
+        tipo: modalTipo,
+      });
+
+      if (!resultado.sucesso) {
+        Alert.alert('Erro ao adicionar', resultado.mensagem);
+        return;
+      }
+
+      limparForm();
+    } catch (error) {
+      console.error('Erro inesperado ao adicionar transação:', error);
+      Alert.alert('Erro ao adicionar', 'Não foi possível adicionar a transação. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const confirmarExclusao = (id: string) => {
+    Alert.alert(
+      'Excluir transação',
+      'Deseja realmente excluir esta transação?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            setExcluindoId(id);
+            try {
+              const resultado = await removerTransacao(id);
+              if (!resultado.sucesso) {
+                Alert.alert('Erro ao excluir', resultado.mensagem);
+              }
+            } catch (error) {
+              console.error('Erro inesperado ao excluir transação:', error);
+              Alert.alert('Erro ao excluir', 'Não foi possível excluir a transação. Tente novamente.');
+            } finally {
+              setExcluindoId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const categorias = modalTipo === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
@@ -104,7 +180,13 @@ adicionarTransacao({
         <View>
           <Text style={styles.titulo}>{headerTitle}</Text>
           <Text style={styles.saldoFiltrado}>
-            <Text style={{ color: headerColor, fontWeight: 'bold' }}>{headerDisplay}</Text>
+            {carregandoTransacoes ? (
+              'Carregando...'
+            ) : erroTransacoes ? (
+              'Valores indisponíveis'
+            ) : (
+              <Text style={{ color: headerColor, fontWeight: 'bold' }}>{headerDisplay}</Text>
+            )}
           </Text>
         </View>
 
@@ -155,7 +237,15 @@ adicionarTransacao({
 
       {/* Lista */}
       <ScrollView showsVerticalScrollIndicator={false}>
-        {Object.entries(grupos).map(([dataKey, grupo]) => (
+        {carregandoTransacoes ? (
+          <Text style={styles.estadoLista}>Carregando transações...</Text>
+        ) : erroTransacoes ? (
+          <Text style={styles.estadoLista}>{erroTransacoes}</Text>
+        ) : transacoes.length === 0 ? (
+          <Text style={styles.estadoLista}>Nenhuma transação cadastrada.</Text>
+        ) : transacoesFiltradas.length === 0 ? (
+          <Text style={styles.estadoLista}>Nenhuma transação encontrada.</Text>
+        ) : Object.entries(grupos).map(([dataKey, grupo]) => (
           <View key={dataKey}>
             <View style={styles.dataHeader}>
               <Text style={styles.dataLabel}>{formatarData(dataKey)}</Text>
@@ -184,7 +274,8 @@ adicionarTransacao({
                 </Text>
 
                 <TouchableOpacity 
-                  onPress={() => removerTransacao && removerTransacao(t.id)} 
+                  onPress={() => confirmarExclusao(t.id)}
+                  disabled={excluindoId === t.id}
                   style={styles.btnLixeira}
                 >
                   <Trash2 size={16} color="#94A3B8" />
@@ -204,7 +295,7 @@ adicionarTransacao({
               <Text style={styles.modalTitulo}>
                 {modalTipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
               </Text>
-              <TouchableOpacity onPress={limparForm}>
+              <TouchableOpacity onPress={limparForm} disabled={salvando}>
                 <X size={22} color="#666" />
               </TouchableOpacity>
             </View>
@@ -244,9 +335,12 @@ adicionarTransacao({
             <TouchableOpacity
               style={[styles.btnSalvar, { backgroundColor: modalTipo === 'receita' ? '#0D9488' : '#E11D48' }]}
               onPress={salvar}
+              disabled={salvando}
             >
               <Text style={styles.btnSalvarTexto}>
-                ✓ Adicionar {modalTipo === 'receita' ? 'Receita' : 'Despesa'}
+                {salvando
+                  ? 'Salvando...'
+                  : `✓ Adicionar ${modalTipo === 'receita' ? 'Receita' : 'Despesa'}`}
               </Text>
             </TouchableOpacity>
 
@@ -321,6 +415,13 @@ const styles = StyleSheet.create({
   filtroTextoAtivo: { color: '#fff' },
   contadorFiltro: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   contadorTexto: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+  estadoLista: {
+    color: '#64748B',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 32,
+  },
   dataHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -350,7 +451,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  iconeText: { fontSize: 20 },
   itemInfo: { flex: 1 },
   itemDesc: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
   itemCat: { fontSize: 12, color: '#94A3B8', marginTop: 2 },

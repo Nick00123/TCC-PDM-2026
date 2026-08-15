@@ -1,7 +1,8 @@
 import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp, X } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Transacao, useFinance } from '../_layout';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+import type { Transacao } from '../../src/tipos';
 
 type Dica = {
   id: string;
@@ -166,7 +167,13 @@ const CORES_TEXTO: { [key: string]: string } = {
 };
 
 export default function Dicas() {
-  const { transacoes, totalReceitas, totalDespesas } = useFinance();
+  const {
+    transacoes,
+    totalReceitas,
+    totalDespesas,
+    carregandoTransacoes,
+    erroTransacoes,
+  } = useFinance();
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
 
   // Lógica da dica personalizada
@@ -217,7 +224,19 @@ export default function Dicas() {
     };
   };
 
-  const dicaPersonalizada = getDicaPersonalizada();
+  const dicaPersonalizada = carregandoTransacoes
+    ? {
+        titulo: 'Carregando seus dados',
+        descricao: 'Aguarde enquanto preparamos sua dica personalizada.',
+        icone: <Target size={22} color="#fff" />,
+      }
+    : erroTransacoes
+    ? {
+        titulo: 'Dica personalizada indisponível',
+        descricao: 'Não foi possível analisar seus dados agora. As dicas da Central de Aprendizado continuam disponíveis.',
+        icone: <Shield size={22} color="#fff" />,
+      }
+    : getDicaPersonalizada();
 
   return (
     <ScrollView style={styles.container}>

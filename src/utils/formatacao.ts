@@ -10,12 +10,6 @@ export function formatarMoeda(valor: number): string {
   });
 }
 
-/** Formata um valor monetário com sinal (+/-) */
-export function formatarComSinal(valor: number): string {
-  if (valor >= 0) return `+R$ ${formatarMoeda(valor)}`;
-  return `-R$ ${formatarMoeda(Math.abs(valor))}`;
-}
-
 /** Converte uma string de data ISO (YYYY-MM-DD) para texto amigável */
 export function formatarData(dataStr: string): string {
   if (!dataStr) return '';

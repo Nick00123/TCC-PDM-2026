@@ -8,24 +8,26 @@ import React, {
   useState,
 } from 'react';
 import { metasApi } from '../api/metasApi';
-import { relatoriosApi } from '../api/relatoriosApi';
+import type { ResultadoMeta } from '../api/metasApi';
 import { transacoesApi } from '../api/transacoesApi';
+import type { ResultadoTransacao } from '../api/transacoesApi';
 import type { Meta, Transacao } from '../tipos';
 import { useAuth } from './AuthContexto';
 
 type FinanceContextoType = {
   transacoes: Transacao[];
+  carregandoTransacoes: boolean;
+  erroTransacoes: string | null;
   metas: Meta[];
   carregandoMetas: boolean;
+  erroMetas: string | null;
 
-  adicionarTransacao: (t: Omit<Transacao, 'id'>) => Promise<void>;
-  removerTransacao: (id: string) => Promise<void>;
+  adicionarTransacao: (t: Omit<Transacao, 'id'>) => Promise<ResultadoTransacao>;
+  removerTransacao: (id: string) => Promise<ResultadoTransacao>;
 
-  carregarTransacoes: () => Promise<void>;
-  adicionarMeta: (titulo: string, total: number) => Promise<void>;
-  excluirMeta: (id: string) => Promise<void>;
-  depositar: (id: string, valor: number) => Promise<void>;
-  carregarMetas: () => Promise<void>;
+  adicionarMeta: (titulo: string, total: number) => Promise<ResultadoMeta>;
+  excluirMeta: (id: string) => Promise<ResultadoMeta>;
+  depositar: (id: string, valor: number) => Promise<ResultadoMeta>;
 
   saldoTotal: number;
   totalReceitas: number;
@@ -41,8 +43,11 @@ export const useFinance = () => useContext(FinanceContexto);
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const { usuario } = useAuth();
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
+  const [erroMetas, setErroMetas] = useState<string | null>(null);
 
   // Guarda o id do usuário "atual" para descartar respostas de um
   // usuário anterior (previne que dados de uma conta sobrescrevam a outra
@@ -54,56 +59,76 @@ const usuarioId = usuario?.id ?? null;
   // ── METAS ────────────────────────────────────────────────
   const carregarMetas = useCallback(async () => {
     setCarregandoMetas(true);
-    const lista = await metasApi.listar();
+    const resultado = await metasApi.listar();
     // Se o usuário mudou durante a busca, descarta o resultado e
     // garante que o estado de carregamento não fique travado em `true`.
     if (userIdRef.current !== usuarioId) {
       setCarregandoMetas(false);
       return;
     }
-    setMetas(lista);
+    if (resultado.mensagem) {
+      setErroMetas(resultado.mensagem);
+    } else {
+      setMetas(resultado.dados);
+      setErroMetas(null);
+    }
     setCarregandoMetas(false);
   }, [usuarioId]);
 
   async function adicionarMeta(titulo: string, total: number) {
-    await metasApi.criar(titulo, total);
-    await carregarMetas();
+    const resultado = await metasApi.criar(titulo, total);
+    if (resultado.sucesso) await carregarMetas();
+    return resultado;
   }
 
   async function excluirMeta(id: string) {
-    await metasApi.excluir(id);
-    await carregarMetas();
+    const resultado = await metasApi.excluir(id);
+    if (resultado.sucesso) await carregarMetas();
+    return resultado;
   }
 
   async function depositar(id: string, valor: number) {
-    await metasApi.depositar(id, valor);
-    await carregarMetas();
+    const resultado = await metasApi.depositar(id, valor);
+    if (resultado.sucesso) await carregarMetas();
+    return resultado;
   }
 
   // ── TRANSAÇÕES ───────────────────────────────────────────
   const carregarTransacoes = useCallback(async () => {
-    const lista = await transacoesApi.listar();
+    setCarregandoTransacoes(true);
+    const resultado = await transacoesApi.listar();
     if (userIdRef.current !== usuarioId) return;
-    setTransacoes(lista);
+    if (resultado.mensagem) {
+      setErroTransacoes(resultado.mensagem);
+    } else {
+      setTransacoes(resultado.dados);
+      setErroTransacoes(null);
+    }
+    setCarregandoTransacoes(false);
   }, [usuarioId]);
 
   async function adicionarTransacao(t: Omit<Transacao, 'id'>) {
-    const ok = await transacoesApi.criar(t);
-    if (ok) await carregarTransacoes();
+    const resultado = await transacoesApi.criar(t);
+    if (resultado.sucesso) await carregarTransacoes();
+    return resultado;
   }
 
   async function removerTransacao(id: string) {
-    const ok = await transacoesApi.remover(id);
-    if (ok) await carregarTransacoes();
+    const resultado = await transacoesApi.remover(id);
+    if (resultado.sucesso) await carregarTransacoes();
+    return resultado;
   }
 
   // Carrega dados quando o usuário autenticado muda (login/logout)
   useEffect(() => {
     userIdRef.current = usuarioId;
+    setTransacoes([]);
+    setErroTransacoes(null);
 
     if (!usuarioId) {
-      setTransacoes([]);
+      setCarregandoTransacoes(false);
       setMetas([]);
+      setErroMetas(null);
       setCarregandoMetas(false);
       return;
     }
@@ -112,25 +137,32 @@ const usuarioId = usuario?.id ?? null;
   }, [usuarioId, carregarMetas, carregarTransacoes]);
 
   // ── RESUMO ───────────────────────────────────────────────
-  const { totalReceitas, totalDespesas, saldoTotal } =
-    relatoriosApi.calcularResumo(transacoes);
+  const totalReceitas = transacoes
+    .filter((transacao) => transacao.tipo === 'receita')
+    .reduce((total, transacao) => total + transacao.valor, 0);
+
+  const totalDespesas = transacoes
+    .filter((transacao) => transacao.tipo === 'despesa')
+    .reduce((total, transacao) => total + transacao.valor, 0);
+
+  const saldoTotal = totalReceitas - totalDespesas;
 
   return (
     <FinanceContexto.Provider
       value={{
         transacoes,
+        carregandoTransacoes,
+        erroTransacoes,
         metas,
 
         adicionarTransacao,
         removerTransacao,
 
-        carregarTransacoes,
         adicionarMeta,
         excluirMeta,
         depositar,
-        carregarMetas,
-
         carregandoMetas,
+        erroMetas,
 
         saldoTotal,
         totalReceitas,

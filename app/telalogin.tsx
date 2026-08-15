@@ -13,54 +13,133 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { supabase } from '../src/api/supabaseCliente';
-import { usuarioApi } from '../src/api/usuarioApi';
+import {
+  criarSessao,
+  endpointAuth,
+  endpointRest,
+  headersAutenticados,
+  headersPublicos,
+  salvarSessao,
+} from '../src/api/sessao';
 import Botao from '../src/componentes/Botao';
-import { useAuth } from './_layout';
+import { useAuth } from '../src/contextos/AuthContexto';
+
+function mensagemDeErro(erro: any): string {
+  const mensagem = erro?.msg || erro?.error_description || erro?.message || erro?.error || '';
+  const texto = `${erro?.code || ''} ${mensagem}`.toLowerCase();
+
+  if (texto.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (texto.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (texto.includes('already registered') || texto.includes('user_already_exists')) {
+    return 'Este e-mail já está cadastrado.';
+  }
+  if (texto.includes('at least 6 characters')) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (texto.includes('rate limit')) return 'Muitas tentativas. Aguarde e tente novamente.';
+  if (texto.includes('weak_password')) return 'A senha é muito fraca.';
+
+  return mensagem || 'Não foi possível concluir a operação. Tente novamente.';
+}
 
 export default function App() {
   const [gmail, setGmail] = useState('');
   const [senha, setSenha] = useState('');
-  const { setUsuario } = useAuth();
   const [nome, setNome] = useState('');
   const [aba, setAba] = useState<'entrar' | 'criar'>('entrar');
   const [verSenha, setVerSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const router = useRouter();
+  const { entrarComSessao } = useAuth();
 
   const confirmar = async () => {
     if (!gmail || !senha) {
       Alert.alert("Erro", "Preencha os campos!");
       return;
     }
+    if (aba === 'criar' && !nome.trim()) {
+      Alert.alert('Erro', 'Preencha o nome!');
+      return;
+    }
+
     setCarregando(true);
 
-    if (aba === 'entrar') {
-      const { usuario, mensagem } = await usuarioApi.entrar(gmail, senha);
-      setCarregando(false);
-      if (!usuario) {
-        Alert.alert("Erro no login", mensagem || "Não foi possível entrar.");
-        return;
-      }
-      setUsuario(usuario);
-      router.replace('/');
-    } else {
-      if (!nome) {
-        setCarregando(false);
-        Alert.alert("Erro", "Preencha o nome!");
-        return;
-      }
-      const { usuario, mensagem } = await usuarioApi.cadastrar(nome, gmail, senha);
-      setCarregando(false);
-      if (!usuario) {
+    try {
+      const email = gmail.trim().toLowerCase();
+      const resposta = await fetch(
+        endpointAuth(aba === 'entrar' ? 'token?grant_type=password' : 'signup'),
+        {
+          method: 'POST',
+          headers: headersPublicos(),
+          body: JSON.stringify(
+            aba === 'entrar'
+              ? { email, password: senha }
+              : { email, password: senha, data: { nome: nome.trim() } }
+          ),
+        }
+      );
+      const dados = await resposta.json();
+
+      if (!resposta.ok) {
         Alert.alert(
-          mensagem?.startsWith("Conta criada") ? "Verifique seu e-mail" : "Erro no cadastro",
-          mensagem || "Não foi possível criar a conta."
+          aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+          mensagemDeErro(dados)
         );
         return;
       }
-      setUsuario(usuario);
+
+      const sessao = criarSessao(dados);
+
+      if (!sessao) {
+        if (aba === 'criar' && (dados.user || dados.id)) {
+          Alert.alert(
+            'Verifique seu e-mail',
+            'Conta criada! Confirme o e-mail que enviamos para ativar o seu login.'
+          );
+          return;
+        }
+
+        Alert.alert(
+          aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+          'O servidor não retornou uma sessão válida.'
+        );
+        return;
+      }
+
+      await salvarSessao(sessao);
+      entrarComSessao(sessao);
+
+      if (aba === 'criar') {
+        const perfilResposta = await fetch(endpointRest('perfis?on_conflict=id'), {
+          method: 'POST',
+          headers: {
+            ...(await headersAutenticados()),
+            Prefer: 'resolution=merge-duplicates,return=minimal',
+          },
+          body: JSON.stringify({
+            id: sessao.user.id,
+            nome: nome.trim(),
+            email,
+            renda_mensal: 0,
+            plano: 'free',
+          }),
+        });
+
+        if (!perfilResposta.ok) {
+          console.error('Erro ao criar perfil:', await perfilResposta.text());
+          Alert.alert(
+            'Conta criada',
+            'Sua conta foi criada, mas não foi possível salvar os dados do perfil agora.'
+          );
+        }
+      }
+
       router.replace('/');
+    } catch (erro) {
+      Alert.alert(
+        aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+        mensagemDeErro(erro)
+      );
+    } finally {
+      setCarregando(false);
     }
   };
 
@@ -156,13 +235,28 @@ export default function App() {
                     Alert.alert('Esqueci minha senha', 'Digite seu e-mail acima para receber o link de redefinição.');
                     return;
                   }
-                  const { error } = await supabase.auth.resetPasswordForEmail(gmail, {
-                    redirectTo: 'com.edufinance.app://reset',
-                  });
-                  if (error) {
-                    Alert.alert('Erro', 'Não foi possível enviar o link. Tente novamente.');
-                  } else {
+                  try {
+                    const redirectTo = encodeURIComponent('com.edufinance.app://reset');
+                    const resposta = await fetch(
+                      endpointAuth(`recover?redirect_to=${redirectTo}`),
+                      {
+                        method: 'POST',
+                        headers: headersPublicos(),
+                        body: JSON.stringify({
+                          email: gmail.trim().toLowerCase(),
+                        }),
+                      }
+                    );
+                    const dados = await resposta.json();
+
+                    if (!resposta.ok) {
+                      Alert.alert('Erro', mensagemDeErro(dados));
+                      return;
+                    }
+
                     Alert.alert('E-mail enviado!', `Enviamos um link de redefinição de senha para ${gmail}. Verifique sua caixa de entrada.`);
+                  } catch {
+                    Alert.alert('Erro', 'Não foi possível enviar o link. Tente novamente.');
                   }
                 }}
               >

@@ -1,8 +1,9 @@
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+import type { Meta } from '../../src/tipos';
 import { formatarMoeda } from '../../src/utils/formatacao';
-import { Meta, useFinance } from '../_layout';
 
 export default function Metas() {
   const {
@@ -11,43 +12,144 @@ export default function Metas() {
   depositar,
   excluirMeta,
   carregandoMetas,
+  erroMetas,
 } = useFinance();
   const [metaSelecionada, setMetaSelecionada] = useState<string | null>(null);
   const [valorDeposito, setValorDeposito] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [titulo, setTitulo] = useState('');
   const [total, setTotal] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [depositando, setDepositando] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
-
-
-
-const metasAndamento = (metas ?? []).filter(
+  const metasAndamento = (metas ?? []).filter(
     (m: Meta) => m.atual < m.total
-);
+  );
 
-const metasConcluidas = (metas ?? []).filter(
+  const metasConcluidas = (metas ?? []).filter(
     (m: Meta) => m.atual >= m.total
-);
+  );
 
   const salvar = async () => {
+    if (salvando) return;
 
-  if (!titulo.trim()) return;
+    const tituloLimpo = titulo.trim();
+    if (!tituloLimpo) {
+      Alert.alert('Título obrigatório', 'Informe um título para a meta.');
+      return;
+    }
 
-  if (!total.trim()) return;
+    if (!total.trim()) {
+      Alert.alert('Valor obrigatório', 'Informe o valor necessário para a meta.');
+      return;
+    }
 
-  const valor = Number(total.replace(',', '.'));
+    const valor = Number(total.trim().replace(',', '.'));
+    if (!Number.isFinite(valor) || valor <= 0) {
+      Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
+      return;
+    }
 
-  if (isNaN(valor)) return;
+    setSalvando(true);
+    try {
+      const resultado = await adicionarMeta(tituloLimpo, valor);
 
-  await adicionarMeta(titulo, valor);
+      if (!resultado.sucesso) {
+        Alert.alert('Erro ao criar meta', resultado.mensagem);
+        return;
+      }
 
-Alert.alert('Sucesso', 'Meta criada com sucesso!');
+      Alert.alert('Sucesso', 'Meta criada com sucesso!');
+      setTitulo('');
+      setTotal('');
+      setModalAberto(false);
+    } catch (error) {
+      console.error('Erro inesperado ao criar meta:', error);
+      Alert.alert('Erro ao criar meta', 'Não foi possível criar a meta. Tente novamente.');
+    } finally {
+      setSalvando(false);
+    }
+  };
 
-  setTitulo('');
-  setTotal('');
-  setModalAberto(false);
+  const confirmarExclusao = (id: string) => {
+    if (excluindoId === id) return;
 
-};
+    Alert.alert('Excluir meta', 'Deseja realmente excluir esta meta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setExcluindoId(id);
+          try {
+            const resultado = await excluirMeta(id);
+            if (!resultado.sucesso) {
+              Alert.alert('Erro ao excluir', resultado.mensagem);
+            }
+          } catch (error) {
+            console.error('Erro inesperado ao excluir meta:', error);
+            Alert.alert('Erro ao excluir', 'Não foi possível excluir a meta. Tente novamente.');
+          } finally {
+            setExcluindoId(null);
+          }
+        },
+      },
+    ]);
+  };
+
+  const confirmarDeposito = async () => {
+    if (depositando || !metaSelecionada) return;
+
+    if (!valorDeposito.trim()) {
+      Alert.alert('Valor obrigatório', 'Informe o valor do depósito.');
+      return;
+    }
+
+    const valor = Number(valorDeposito.trim().replace(',', '.'));
+    if (!Number.isFinite(valor) || valor <= 0) {
+      Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
+      return;
+    }
+
+    const meta = metas.find((item: Meta) => item.id === metaSelecionada);
+    if (!meta) {
+      Alert.alert('Meta não encontrada', 'Não foi possível localizar a meta selecionada.');
+      return;
+    }
+
+    const restante = meta.total - meta.atual;
+    if (restante <= 0) {
+      Alert.alert('Meta concluída', 'Esta meta já foi concluída.');
+      return;
+    }
+
+    if (valor > restante) {
+      Alert.alert(
+        'Valor acima do necessário',
+        `Faltam R$ ${formatarMoeda(restante)} para concluir esta meta.`
+      );
+      return;
+    }
+
+    setDepositando(true);
+    try {
+      const resultado = await depositar(metaSelecionada, valor);
+      if (!resultado.sucesso) {
+        Alert.alert('Erro ao depositar', resultado.mensagem);
+        return;
+      }
+
+      Alert.alert('Sucesso', 'Depósito realizado!');
+      setValorDeposito('');
+      setMetaSelecionada(null);
+    } catch (error) {
+      console.error('Erro inesperado ao depositar:', error);
+      Alert.alert('Erro ao depositar', 'Não foi possível realizar o depósito. Tente novamente.');
+    } finally {
+      setDepositando(false);
+    }
+  };
 
 if (carregandoMetas) {
   return (
@@ -79,6 +181,12 @@ if (carregandoMetas) {
         </TouchableOpacity>
       </View>
 
+      {erroMetas && (
+        <View style={styles.erroCard}>
+          <Text style={styles.erroTexto}>{erroMetas}</Text>
+        </View>
+      )}
+
       {/* Em andamento */}
       {metasAndamento.length > 0 && (
         <>
@@ -93,10 +201,9 @@ if (carregandoMetas) {
                 <View style={styles.cardHeader}>
                   <Text style={styles.metaTitulo}>{meta.titulo}</Text>
                   <TouchableOpacity
-  onPress={async () => {
-    await excluirMeta(meta.id);
-  }}
->
+                    onPress={() => confirmarExclusao(meta.id)}
+                    disabled={excluindoId === meta.id}
+                  >
                     <Trash2 size={18} color="#ccc" />
                   </TouchableOpacity>
                 </View>
@@ -141,7 +248,7 @@ if (carregandoMetas) {
       )}
 
       {/* Vazio */}
-      {(metas ?? []).length === 0 && (
+      {!erroMetas && (metas ?? []).length === 0 && (
         <View style={styles.vazio}>
           <Target size={48} color="#1A9E75" />
           <Text style={styles.vazioTitulo}>Nenhuma meta ainda</Text>
@@ -172,11 +279,11 @@ if (carregandoMetas) {
               onChangeText={setTotal}
             />
 
-            <TouchableOpacity style={styles.btnSalvar} onPress={salvar}>
-              <Text style={styles.btnSalvarTexto}>Criar Meta</Text>
+            <TouchableOpacity style={styles.btnSalvar} onPress={salvar} disabled={salvando}>
+              <Text style={styles.btnSalvarTexto}>{salvando ? 'Salvando...' : 'Criar Meta'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalAberto(false)}>
+            <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalAberto(false)} disabled={salvando}>
               <Text style={styles.btnCancelarTexto}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -200,27 +307,13 @@ if (carregandoMetas) {
 
             <TouchableOpacity
               style={styles.btnSalvar}
-              onPress={async () => {
-    if (!valorDeposito || !metaSelecionada) return;
-
-    const valor = Number(valorDeposito.replace(',', '.'));
-
-if (isNaN(valor) || valor <= 0) {
-    return;
-}
-
-await depositar(metaSelecionada, valor);
-
-Alert.alert('Sucesso', 'Depósito realizado!');
-
-    setValorDeposito('');
-    setMetaSelecionada(null);
-}}
+              onPress={confirmarDeposito}
+              disabled={depositando}
             >
-              <Text style={styles.btnSalvarTexto}>Confirmar</Text>
+              <Text style={styles.btnSalvarTexto}>{depositando ? 'Depositando...' : 'Confirmar'}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.btnCancelar} onPress={() => setMetaSelecionada(null)}>
+            <TouchableOpacity style={styles.btnCancelar} onPress={() => setMetaSelecionada(null)} disabled={depositando}>
               <Text style={styles.btnCancelarTexto}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -254,6 +347,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   btnNovaTexto: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  erroCard: {
+    backgroundColor: '#FFF1F2',
+    borderColor: '#FECDD3',
+    borderWidth: 1,
+    borderRadius: 10,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 12,
+  },
+  erroTexto: { color: '#BE123C', fontSize: 13, textAlign: 'center' },
   secaoTitulo: {
     fontSize: 11,
     fontWeight: '700',

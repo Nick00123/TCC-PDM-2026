@@ -1,6 +1,8 @@
 import { Bell, BellRing, CheckCheck, Trash2, X } from 'lucide-react-native';
-import React from 'react';
+import React, { useState } from 'react';
 import {
+    ActivityIndicator,
+    Alert,
     FlatList,
     Modal,
     StyleSheet,
@@ -45,38 +47,107 @@ function formatarTempo(criadaEm: string): string {
 }
 
 export default function NotificacoesModal({ visivel, onFechar }: Props) {
-  const { notificacoes, marcarLida, marcarTodasLidas, excluir } =
+  const { notificacoes, carregando, erro, marcarLida, marcarTodasLidas, excluir } =
     useNotificacoes();
+  const [marcandoId, setMarcandoId] = useState<string | null>(null);
+  const [marcandoTodas, setMarcandoTodas] = useState(false);
+  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+
+  const lerNotificacao = async (item: Notificacao) => {
+    if (item.lida || marcandoId === item.id) return;
+
+    setMarcandoId(item.id);
+    try {
+      const resultado = await marcarLida(item.id);
+      if (!resultado.sucesso) {
+        Alert.alert('Erro', resultado.mensagem);
+      }
+    } catch (error) {
+      console.error('Erro inesperado ao marcar notificação:', error);
+      Alert.alert('Erro', 'Não foi possível marcar a notificação como lida.');
+    } finally {
+      setMarcandoId(null);
+    }
+  };
+
+  const lerTodas = async () => {
+    if (marcandoTodas) return;
+
+    setMarcandoTodas(true);
+    try {
+      const resultado = await marcarTodasLidas();
+      if (!resultado.sucesso) {
+        Alert.alert('Erro', resultado.mensagem);
+      }
+    } catch (error) {
+      console.error('Erro inesperado ao marcar todas como lidas:', error);
+      Alert.alert('Erro', 'Não foi possível marcar todas as notificações como lidas.');
+    } finally {
+      setMarcandoTodas(false);
+    }
+  };
+
+  const confirmarExclusao = (id: string) => {
+    if (excluindoId === id) return;
+
+    Alert.alert('Excluir notificação', 'Deseja realmente excluir esta notificação?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setExcluindoId(id);
+          try {
+            const resultado = await excluir(id);
+            if (!resultado.sucesso) {
+              Alert.alert('Erro', resultado.mensagem);
+            }
+          } catch (error) {
+            console.error('Erro inesperado ao excluir notificação:', error);
+            Alert.alert('Erro', 'Não foi possível excluir a notificação.');
+          } finally {
+            setExcluindoId(null);
+          }
+        },
+      },
+    ]);
+  };
 
   const renderItem = ({ item }: { item: Notificacao }) => {
     const estilo = CORES_TIPO[item.tipo] || CORES_TIPO.sistema;
     const icone = ICONES_TIPO[item.tipo] || ICONES_TIPO.sistema;
 
     return (
-      <TouchableOpacity
+      <View
         style={[styles.item, !item.lida && styles.itemNaoLida]}
-        onPress={() => marcarLida(item.id)}
-        activeOpacity={0.7}
       >
-        <View style={[styles.iconeBox, { backgroundColor: estilo.fundo }]}>
-          {icone}
-        </View>
-        <View style={styles.info}>
-          <Text style={styles.titulo}>{item.titulo}</Text>
-          <Text style={styles.mensagem} numberOfLines={3}>
-            {item.mensagem}
-          </Text>
-          <Text style={styles.tempo}>{formatarTempo(item.criadaEm)}</Text>
-        </View>
-        {!item.lida && <View style={styles.pontoNaoLida} />}
         <TouchableOpacity
-          onPress={() => excluir(item.id)}
+          style={styles.itemConteudo}
+          onPress={() => lerNotificacao(item)}
+          disabled={item.lida || marcandoId === item.id}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.iconeBox, { backgroundColor: estilo.fundo }]}>
+            {icone}
+          </View>
+          <View style={styles.info}>
+            <Text style={styles.titulo}>{item.titulo}</Text>
+            <Text style={styles.mensagem} numberOfLines={3}>
+              {item.mensagem}
+            </Text>
+            <Text style={styles.tempo}>{formatarTempo(item.criadaEm)}</Text>
+          </View>
+          {!item.lida && <View style={styles.pontoNaoLida} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => confirmarExclusao(item.id)}
+          disabled={excluindoId === item.id}
           style={styles.btnExcluir}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Trash2 size={16} color="#CCC" />
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -100,10 +171,13 @@ export default function NotificacoesModal({ visivel, onFechar }: Props) {
               {notificacoes.some((n) => !n.lida) && (
                 <TouchableOpacity
                   style={styles.btnLerTodas}
-                  onPress={() => marcarTodasLidas()}
+                  onPress={lerTodas}
+                  disabled={marcandoTodas}
                 >
                   <CheckCheck size={16} color="#1A9E75" />
-                  <Text style={styles.btnLerTodasTexto}>Ler todas</Text>
+                  <Text style={styles.btnLerTodasTexto}>
+                    {marcandoTodas ? 'Marcando...' : 'Ler todas'}
+                  </Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity onPress={onFechar} style={styles.btnFechar}>
@@ -112,7 +186,18 @@ export default function NotificacoesModal({ visivel, onFechar }: Props) {
             </View>
           </View>
 
-          {notificacoes.length === 0 ? (
+          {carregando ? (
+            <View style={styles.vazio}>
+              <ActivityIndicator size="large" color="#1A9E75" />
+              <Text style={styles.vazioTexto}>Carregando notificações...</Text>
+            </View>
+          ) : erro ? (
+            <View style={styles.vazio}>
+              <Bell size={40} color="#E11D48" />
+              <Text style={styles.vazioTitulo}>Não foi possível carregar</Text>
+              <Text style={styles.vazioTexto}>{erro}</Text>
+            </View>
+          ) : notificacoes.length === 0 ? (
             <View style={styles.vazio}>
               <Bell size={40} color="#CCC" />
               <Text style={styles.vazioTitulo}>Nenhuma notificação</Text>
@@ -181,6 +266,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F1F1',
   },
+  itemConteudo: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   itemNaoLida: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
   iconeBox: {
     width: 40,

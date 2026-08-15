@@ -4,28 +4,9 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNotificacoes } from '../contextos/NotificacoesContexto';
 import NotificacoesModal from './NotificacoesModal';
 
-type CabecalhoProps = {
-  notificacoesCount?: number;
-  onPressNotificacoes?: () => void;
-};
-
-export default function Cabecalho({
-  notificacoesCount,
-  onPressNotificacoes,
-}: CabecalhoProps) {
+export default function Cabecalho() {
   const { naoLidas } = useNotificacoes();
   const [modalAberto, setModalAberto] = useState(false);
-
-  // Se o usuário passar via props, usa o valor controlado; senão usa o contexto
-  const contador = notificacoesCount ?? naoLidas;
-
-  const handlePress = () => {
-    if (onPressNotificacoes) {
-      onPressNotificacoes();
-    } else {
-      setModalAberto(true);
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -36,14 +17,14 @@ export default function Cabecalho({
 
       <TouchableOpacity
         style={styles.botaoNotificacao}
-        onPress={handlePress}
+        onPress={() => setModalAberto(true)}
         activeOpacity={0.6}
       >
         <Bell color="#4A5568" size={22} />
-        {contador > 0 && (
+        {naoLidas > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeTexto}>
-              {contador > 9 ? '9+' : contador}
+              {naoLidas > 9 ? '9+' : naoLidas}
             </Text>
           </View>
         )}

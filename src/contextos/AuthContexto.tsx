@@ -5,79 +5,93 @@ import React, {
   useEffect,
   useState,
 } from 'react';
-import { supabase } from '../api/supabaseCliente';
+import {
+  carregarSessao,
+  endpointAuth,
+  headersPublicos,
+  obterSessaoValida,
+  removerSessao,
+} from '../api/sessao';
+import type { Sessao } from '../api/sessao';
 import type { Usuario } from '../tipos';
 
 type AuthContextoType = {
   usuario: Usuario | null;
-  setUsuario: React.Dispatch<React.SetStateAction<Usuario | null>>;
+  entrarComSessao: (sessao: Sessao) => void;
   logout: () => Promise<void>;
-  carregando: boolean;
 };
 
 const AuthContexto = createContext<AuthContextoType>({
   usuario: null,
-  setUsuario: () => {},
+  entrarComSessao: () => {},
   logout: async () => {},
-  carregando: true,
 });
 
 export const useAuth = () => useContext(AuthContexto);
 
+function montarUsuario(user: Sessao['user']): Usuario {
+  return {
+    id: user.id,
+    nome: user.user_metadata?.nome || user.email?.split('@')[0] || '',
+    email: user.email || '',
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [carregando, setCarregando] = useState(true);
 
-  // Hidrata a sessão salva no AsyncStorage ao iniciar o app
+  // Hidrata a sessão HTTP salva no AsyncStorage ao iniciar o app
   useEffect(() => {
     let ativo = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      const sessao = data.session;
-      if (ativo && sessao?.user) {
-        const user = sessao.user;
-        setUsuario({
-          id: user.id,
-          nome: user.user_metadata?.nome || user.email?.split('@')[0] || '',
-          email: user.email || '',
-          rendaMensal: 0,
-          plano: 'free',
-        });
-      }
-      if (ativo) setCarregando(false);
-    });
+    async function recuperarSessao() {
+      try {
+        const sessao = await obterSessaoValida();
 
-    // Mantém o estado sincronizado com eventos de auth (login/logout/refresh)
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sessao) => {
-      if (!ativo) return;
-      if (sessao?.user) {
-        const user = sessao.user;
-        setUsuario({
-          id: user.id,
-          nome: user.user_metadata?.nome || user.email?.split('@')[0] || '',
-          email: user.email || '',
-          rendaMensal: 0,
-          plano: 'free',
-        });
-      } else {
-        setUsuario(null);
+        if (ativo) {
+          setUsuario(sessao ? montarUsuario(sessao.user) : null);
+        }
+      } catch {
+        if (ativo) {
+          setUsuario(null);
+        }
       }
-      if (ativo) setCarregando(false);
-    });
+    }
+
+    recuperarSessao();
 
     return () => {
       ativo = false;
-      listener.subscription.unsubscribe();
     };
   }, []);
 
+  const entrarComSessao = (sessao: Sessao) => {
+    setUsuario(montarUsuario(sessao.user));
+  };
+
   const logout = async () => {
-    setUsuario(null);
-    await supabase.auth.signOut();
+    const sessao = await carregarSessao();
+
+    try {
+      if (sessao?.accessToken) {
+        await fetch(endpointAuth('logout'), {
+          method: 'POST',
+          headers: {
+            ...headersPublicos(),
+            Authorization: `Bearer ${sessao.accessToken}`,
+          },
+        });
+      }
+    } catch {
+      console.error('Não foi possível encerrar a sessão remota.');
+    } finally {
+      setUsuario(null);
+      await removerSessao();
+    }
   };
 
   return (
-    <AuthContexto.Provider value={{ usuario, setUsuario, logout, carregando }}>
+    <AuthContexto.Provider value={{ usuario, entrarComSessao, logout }}>
       {children}
     </AuthContexto.Provider>
   );

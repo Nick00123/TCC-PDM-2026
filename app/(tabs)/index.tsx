@@ -7,17 +7,25 @@ import BalanceCard from '../../src/componentes/BalanceCard';
 import Cabecalho from '../../src/componentes/Cabecalho';
 import MetaCard from '../../src/componentes/MetaCard';
 import TransacaoItem from '../../src/componentes/TransacaoItem';
-import { Meta, Transacao, useFinance } from '../_layout';
+import { useFinance } from '../../src/contextos/FinanceContexto';
+import type { Meta, Transacao } from '../../src/tipos';
 
-//import { useFinance } from '../_layout';
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Limite de itens exibidos na tela inicial para evitar poluição visual
 const LIMITE_METAS = 5;
 const LIMITE_TRANSACOES = 5;
 
 export default function Home() {
-  const { saldoTotal, totalReceitas, totalDespesas, transacoes, metas } = useFinance();
+  const {
+    saldoTotal,
+    totalReceitas,
+    totalDespesas,
+    transacoes,
+    carregandoTransacoes,
+    erroTransacoes,
+    metas,
+  } = useFinance();
 
   const metasEmAndamento = metas.filter((meta: Meta) => meta.atual < meta.total);
   const metasVisiveis = metasEmAndamento.slice(0, LIMITE_METAS);
@@ -26,7 +34,13 @@ export default function Home() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Cabecalho />
-      <BalanceCard saldo={saldoTotal} receitas={totalReceitas} despesas={totalDespesas} />
+      {carregandoTransacoes ? (
+        <View style={styles.aviso}><Text style={styles.avisoTexto}>Carregando resumo financeiro...</Text></View>
+      ) : erroTransacoes ? (
+        <View style={styles.aviso}><Text style={styles.avisoTexto}>Resumo financeiro indisponível.</Text></View>
+      ) : (
+        <BalanceCard saldo={saldoTotal} receitas={totalReceitas} despesas={totalDespesas} />
+      )}
       <AcoesRapidas />
 
       {metasEmAndamento.length > 0 && (
@@ -49,7 +63,7 @@ export default function Home() {
         </>
       )}
 
-      {transacoes.length > 0 && (
+      {!carregandoTransacoes && !erroTransacoes && transacoes.length > 0 && (
         <>
           {transacoesVisiveis.map((t: Transacao) => (
             <TransacaoItem key={t.id} {...t} />
@@ -69,8 +83,12 @@ export default function Home() {
         </>
       )}
 
-      <EvolucaoMensal />
-      <GastosPorCategoria />
+      {!carregandoTransacoes && !erroTransacoes && (
+        <>
+          <EvolucaoMensal transacoes={transacoes} />
+          <GastosPorCategoria transacoes={transacoes} />
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -85,12 +103,14 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 32,
   },
-secaoTitulo: {
-  fontSize: 16,
-  fontWeight: 'bold',
-  marginBottom: 12,
-  marginTop: 4,
-},
+  aviso: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  avisoTexto: { color: '#64748B', fontSize: 14 },
   verMais: {
     flexDirection: 'row',
     alignItems: 'center',
