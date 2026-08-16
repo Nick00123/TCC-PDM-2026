@@ -87,7 +87,7 @@ WHERE a.usuario_id = b.usuario_id
 
 UPDATE public.notificacoes n
 SET chave_evento = 'meta_concluida:' || m.id::text
-FROM public."Metas" m
+FROM public.metas m
 WHERE n.tipo = 'meta'
   AND n.chave_evento IS NULL
   AND n.mensagem = 'Parabéns! Você alcançou a meta "' || m.titulo || '".';

@@ -19,7 +19,7 @@ export type ResultadoListagemMetas = {
 
 /**
  * API de Metas
- * Encapsula todas as operações de CRUD da tabela `Metas`.
+ * Encapsula todas as operações de CRUD da tabela `metas`.
  */
 export const metasApi = {
   /** Retorna o id do usuário autenticado, ou null se não logado */
@@ -43,7 +43,7 @@ export const metasApi = {
       const headers = await headersAutenticados();
       const resposta = await fetch(
         endpointRest(
-          `Metas?select=*&user_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`
+          `metas?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`
         ),
         { headers }
       );
@@ -90,11 +90,11 @@ export const metasApi = {
     }
 
     try {
-      const resposta = await fetch(endpointRest('Metas'), {
+      const resposta = await fetch(endpointRest('metas'), {
         method: 'POST',
         headers: await headersAutenticados(),
         body: JSON.stringify({
-          user_id: usuarioId,
+          usuario_id: usuarioId,
           titulo,
           valor_objetivo: total,
           valor_atual: 0,
@@ -133,7 +133,7 @@ export const metasApi = {
 
       const resposta = await fetch(
         endpointRest(
-          `Metas?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(usuarioId)}`
+          `metas?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`
         ),
         {
           method: 'DELETE',
@@ -177,7 +177,7 @@ export const metasApi = {
     try {
       const consulta = await fetch(
         endpointRest(
-          `Metas?select=valor_atual,valor_objetivo&id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(usuarioId)}`
+          `metas?select=valor_atual,valor_objetivo&id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`
         ),
         { headers: await headersAutenticados() }
       );
@@ -219,7 +219,7 @@ export const metasApi = {
 
       const resposta = await fetch(
         endpointRest(
-          `Metas?id=eq.${encodeURIComponent(id)}&user_id=eq.${encodeURIComponent(usuarioId)}`
+          `metas?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`
         ),
         {
           method: 'PATCH',

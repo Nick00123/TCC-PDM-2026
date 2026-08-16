@@ -16,9 +16,11 @@ import { useAuth } from './AuthContexto';
 
 type FinanceContextoType = {
   transacoes: Transacao[];
+  transacoesUsuarioId: string | null;
   carregandoTransacoes: boolean;
   erroTransacoes: string | null;
   metas: Meta[];
+  metasUsuarioId: string | null;
   carregandoMetas: boolean;
   erroMetas: string | null;
 
@@ -43,9 +45,11 @@ export const useFinance = () => useContext(FinanceContexto);
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const { usuario } = useAuth();
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [transacoesUsuarioId, setTransacoesUsuarioId] = useState<string | null>(null);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [metasUsuarioId, setMetasUsuarioId] = useState<string | null>(null);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
   const [erroMetas, setErroMetas] = useState<string | null>(null);
 
@@ -69,6 +73,7 @@ const usuarioId = usuario?.id ?? null;
       setErroMetas(resultado.mensagem);
     } else {
       setMetas(resultado.dados);
+      setMetasUsuarioId(usuarioId);
       setErroMetas(null);
     }
     setCarregandoMetas(false);
@@ -101,6 +106,7 @@ const usuarioId = usuario?.id ?? null;
       setErroTransacoes(resultado.mensagem);
     } else {
       setTransacoes(resultado.dados);
+      setTransacoesUsuarioId(usuarioId);
       setErroTransacoes(null);
     }
     setCarregandoTransacoes(false);
@@ -121,6 +127,8 @@ const usuarioId = usuario?.id ?? null;
   // Carrega dados quando o usuário autenticado muda (login/logout)
   useEffect(() => {
     userIdRef.current = usuarioId;
+    setTransacoesUsuarioId(null);
+    setMetasUsuarioId(null);
     setTransacoes([]);
     setMetas([]);
     setErroTransacoes(null);
@@ -139,11 +147,16 @@ const usuarioId = usuario?.id ?? null;
   }, [usuarioId, carregarMetas, carregarTransacoes]);
 
   // ── RESUMO ───────────────────────────────────────────────
-  const totalReceitas = transacoes
+  const transacoesPublicadas =
+    transacoesUsuarioId === usuarioId ? transacoes : [];
+  const metasPublicadas =
+    metasUsuarioId === usuarioId ? metas : [];
+
+  const totalReceitas = transacoesPublicadas
     .filter((transacao) => transacao.tipo === 'receita')
     .reduce((total, transacao) => total + transacao.valor, 0);
 
-  const totalDespesas = transacoes
+  const totalDespesas = transacoesPublicadas
     .filter((transacao) => transacao.tipo === 'despesa')
     .reduce((total, transacao) => total + transacao.valor, 0);
 
@@ -152,10 +165,12 @@ const usuarioId = usuario?.id ?? null;
   return (
     <FinanceContexto.Provider
       value={{
-        transacoes,
+        transacoes: transacoesPublicadas,
+        transacoesUsuarioId,
         carregandoTransacoes,
         erroTransacoes,
-        metas,
+        metas: metasPublicadas,
+        metasUsuarioId,
 
         adicionarTransacao,
         removerTransacao,

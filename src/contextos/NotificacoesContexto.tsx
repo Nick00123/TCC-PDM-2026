@@ -61,7 +61,11 @@ export function NotificacoesProvider({
   const { usuario } = useAuth();
   const {
     metas,
+    metasUsuarioId,
+    carregandoMetas,
+    erroMetas,
     transacoes,
+    transacoesUsuarioId,
     carregandoTransacoes,
     erroTransacoes,
   } = useFinance();
@@ -264,10 +268,17 @@ export function NotificacoesProvider({
     }
 
 
-    if (
-      carregandoTransacoes ||
-      erroTransacoes
-    ) {
+    const podeVerificarMetas =
+      metasUsuarioId === usuario.id &&
+      !carregandoMetas &&
+      !erroMetas;
+
+    const podeVerificarTransacoes =
+      transacoesUsuarioId === usuario.id &&
+      !carregandoTransacoes &&
+      !erroTransacoes;
+
+    if (!podeVerificarMetas && !podeVerificarTransacoes) {
       return;
     }
 
@@ -298,10 +309,12 @@ export function NotificacoesProvider({
          */
 
         const metasConcluidas =
-          metas.filter(
-            (m: Meta) =>
-              m.atual >= m.total
-          );
+          podeVerificarMetas
+            ? metas.filter(
+                (m: Meta) =>
+                  m.atual >= m.total
+              )
+            : [];
 
 
         for (
@@ -335,6 +348,10 @@ export function NotificacoesProvider({
             continue;
           }
 
+          if (userIdRef.current !== usuarioIdVerificacao) {
+            return;
+          }
+
 
           console.log(
             '🔔 Verificando meta concluída:',
@@ -355,7 +372,12 @@ export function NotificacoesProvider({
                 'meta',
 
               chaveEvento,
-            });
+            }, usuarioIdVerificacao);
+
+
+          if (userIdRef.current !== usuarioIdVerificacao) {
+            return;
+          }
 
 
           if (criada) {
@@ -380,6 +402,7 @@ export function NotificacoesProvider({
          * ====================================================
          */
 
+        if (podeVerificarTransacoes) {
         const totalReceitas =
           transacoes
             .filter(
@@ -488,6 +511,7 @@ export function NotificacoesProvider({
           );
 
         }
+        }
 
       } catch (error) {
 
@@ -517,7 +541,11 @@ export function NotificacoesProvider({
 
   }, [
     metas,
+    metasUsuarioId,
+    carregandoMetas,
+    erroMetas,
     transacoes,
+    transacoesUsuarioId,
     carregando,
     carregandoTransacoes,
     erroTransacoes,

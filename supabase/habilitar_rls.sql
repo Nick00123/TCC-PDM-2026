@@ -8,7 +8,7 @@
 --
 -- Estrutura esperada:
 --   transacoes.usuario_id (uuid, FK -> auth.users.id)
---   Metas.user_id         (uuid, FK -> auth.users.id)
+--   metas.usuario_id      (uuid, FK -> auth.users.id)
 --   perfis.id             (uuid, PK = auth.uid())
 --   dicas                 (tabela pública, somente leitura)
 -- ═══════════════════════════════════════════════════════════════════
@@ -43,29 +43,29 @@ CREATE POLICY "transacoes_delete_own"
   USING (auth.uid() = usuario_id);
 
 -- ── 2) METAS ─────────────────────────────────────────────────────
-ALTER TABLE "Metas" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE metas ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "metas_select_own" ON "Metas";
-DROP POLICY IF EXISTS "metas_insert_own" ON "Metas";
-DROP POLICY IF EXISTS "metas_update_own" ON "Metas";
-DROP POLICY IF EXISTS "metas_delete_own" ON "Metas";
+DROP POLICY IF EXISTS "metas_select_own" ON metas;
+DROP POLICY IF EXISTS "metas_insert_own" ON metas;
+DROP POLICY IF EXISTS "metas_update_own" ON metas;
+DROP POLICY IF EXISTS "metas_delete_own" ON metas;
 
 CREATE POLICY "metas_select_own"
-  ON "Metas" FOR SELECT
-  USING (auth.uid() = user_id);
+  ON metas FOR SELECT
+  USING (auth.uid() = usuario_id);
 
 CREATE POLICY "metas_insert_own"
-  ON "Metas" FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  ON metas FOR INSERT
+  WITH CHECK (auth.uid() = usuario_id);
 
 CREATE POLICY "metas_update_own"
-  ON "Metas" FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  ON metas FOR UPDATE
+  USING (auth.uid() = usuario_id)
+  WITH CHECK (auth.uid() = usuario_id);
 
 CREATE POLICY "metas_delete_own"
-  ON "Metas" FOR DELETE
-  USING (auth.uid() = user_id);
+  ON metas FOR DELETE
+  USING (auth.uid() = usuario_id);
 
 -- ── 3) PERFIS ────────────────────────────────────────────────────
 -- A chave `perfis.id` é igual a auth.uid() diretamente.
@@ -108,13 +108,11 @@ CREATE POLICY "dicas_select_public"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.perfis (id, nome, email, renda_mensal, plano)
+  INSERT INTO public.perfis (id, nome, email)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'nome', ''),
-    NEW.email,
-    0,
-    'free'
+    NEW.email
   );
   RETURN NEW;
 END;

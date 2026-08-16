@@ -117,9 +117,6 @@ export default function App() {
           body: JSON.stringify({
             id: sessao.user.id,
             nome: nome.trim(),
-            email,
-            renda_mensal: 0,
-            plano: 'free',
           }),
         });
 
