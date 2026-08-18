@@ -1,26 +1,53 @@
 import { useRouter } from 'expo-router';
-import { ChevronRight, FileText, HelpCircle, LogOut, Send, Shield, Target } from 'lucide-react-native';
-import { useState } from 'react';
+import {
+  Bug,
+  ChevronRight,
+  FileText,
+  HelpCircle,
+  Lightbulb,
+  LogOut,
+  Send,
+  Shield,
+  Star,
+  Target,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   endpointRest,
+  endpointAuth,
+  carregarSessao,
+  headersPublicos,
   headersAutenticados,
   obterUsuarioDaSessao,
-} from '../../src/api/sessao';
-import { useAuth } from '../../src/contextos/AuthContexto';
-import { useFinance } from '../../src/contextos/FinanceContexto';
+  removerSessao,
+} from '../../utils/sessao';
+import type { Usuario } from '../../types';
+import { buscarResumo } from '../../utils/requisicoes';
 
 type CategoriaFeedback = 'sugestao' | 'bug' | 'elogio';
 
-const CATEGORIAS_FEEDBACK: { chave: CategoriaFeedback; label: string }[] = [
-  { chave: 'sugestao', label: '💡 Sugestão' },
-  { chave: 'bug', label: '🐞 Bug' },
-  { chave: 'elogio', label: '⭐ Elogio' },
+type OpcaoFeedback = {
+  chave: CategoriaFeedback;
+  icone: LucideIcon;
+  label: string;
+};
+
+const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
+  { chave: 'sugestao', icone: Lightbulb, label: 'Sugestão' },
+  { chave: 'bug', icone: Bug, label: 'Bug' },
+  { chave: 'elogio', icone: Star, label: 'Elogio' },
 ];
 
 export default function Perfil() {
-  const { totalReceitas, totalDespesas, carregandoTransacoes, erroTransacoes } = useFinance();
-  const { usuario, logout } = useAuth();
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [totalReceitas, setTotalReceitas] = useState(0);
+  const [totalDespesas, setTotalDespesas] = useState(0);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
   const [temaEscuro, setTemaEscuro] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [categoriaFeedback, setCategoriaFeedback] = useState<CategoriaFeedback>('sugestao');
@@ -28,6 +55,36 @@ export default function Perfil() {
   const [feedbackEnviado, setFeedbackEnviado] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const router = useRouter();
+
+  async function carregarPerfil() {
+    setCarregandoTransacoes(true);
+    try {
+      const dadosUsuario = await obterUsuarioDaSessao();
+      if (!dadosUsuario) { router.replace('/login'); return; }
+      setUsuario({ id: dadosUsuario.id, nome: dadosUsuario.user_metadata?.nome || dadosUsuario.email?.split('@')[0] || '', email: dadosUsuario.email || '' });
+      const lista = await buscarResumo(dadosUsuario.id, await headersAutenticados());
+      setTotalReceitas(lista.filter((item: any) => item.tipo === 'receita').reduce((total: number, item: any) => total + Number(item.valor), 0));
+      setTotalDespesas(lista.filter((item: any) => item.tipo === 'despesa').reduce((total: number, item: any) => total + Number(item.valor), 0));
+      setErroTransacoes(null);
+    } catch (error) { console.error(error); setErroTransacoes('Resumo indisponível'); }
+    finally { setCarregandoTransacoes(false); }
+  }
+
+  useEffect(() => {
+    if (telaEmFoco) carregarPerfil();
+    // Recarrega somente quando a aba recebe ou perde o foco.
+    // sem essa linha o aplicativo pode entrar em um loop infinito de travamento, rodando a função bilhões de vezes por segundo. já que o carregarPerfil não está colchetes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telaEmFoco]);
+
+  async function logout() {
+    const sessao = await carregarSessao();
+    try {
+      if (sessao?.accessToken) await fetch(endpointAuth('logout'), { method: 'POST', headers: { ...headersPublicos(), Authorization: `Bearer ${sessao.accessToken}` } });
+    } finally {
+      await removerSessao();
+    }
+  }
 
   const enviarFeedback = async () => {
     if (enviandoFeedback) return;
@@ -172,15 +229,18 @@ export default function Perfil() {
         </View>
 
         <Text style={[styles.itemTitulo, { marginHorizontal: 16, marginTop: 16, color: theme.text }]}>Canais de Contato</Text>
-        <TouchableOpacity style={styles.contactButton} onPress={() => Linking.openURL('mailto:nicolas.lima@academico.ifpb.edu.br')}>
-          <Text style={styles.contactButtonText}>Fale Conosco</Text>
+        <TouchableOpacity style={styles.contactButton}
+            onPress={() => Linking.openURL(`mailto:${process.env.EXPO_PUBLIC_SUPPORT_EMAIL}`)}
+            >
+        <Text style={styles.contactButtonText}>Fale Conosco</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.contactButton}
-          onPress={() => Linking.openURL('https://wa.me/5583996807389')}
-        >
-          <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
+
+        <TouchableOpacity style={styles.contactButton}
+          onPress={() => Linking.openURL(`https://wa.me{process.env.EXPO_PUBLIC_WHATSAPP_NUMBER}`)}
+            >
+        <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
+
 
 <View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.itemTitulo, { color: theme.text }]}>Feedback / Enviar Sugestão</Text>
@@ -192,12 +252,16 @@ export default function Perfil() {
           <View style={styles.categoriaRow}>
             {CATEGORIAS_FEEDBACK.map((cat) => {
               const ativa = categoriaFeedback === cat.chave;
+              const Icone = cat.icone;
+              const corIcone = ativa ? '#FFFFFF' : '#64748B';
+
               return (
                 <TouchableOpacity
                   key={cat.chave}
                   style={[styles.categoriaChip, ativa && styles.categoriaChipAtivo]}
                   onPress={() => setCategoriaFeedback(cat.chave)}
                 >
+                  <Icone size={14} color={corIcone} />
                   <Text style={[styles.categoriaTexto, ativa && styles.categoriaTextoAtivo]}>
                     {cat.label}
                   </Text>
@@ -255,7 +319,7 @@ export default function Perfil() {
           setSaindo(true);
           try {
             await logout();
-            router.replace('/telalogin');
+            router.replace('/login');
           } catch (e) {
             console.error('Erro ao sair:', e);
             setSaindo(false);
@@ -354,6 +418,9 @@ feedbackBox: {
     marginTop: 12,
   },
   categoriaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,

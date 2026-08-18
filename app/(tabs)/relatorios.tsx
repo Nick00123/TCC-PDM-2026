@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,7 +15,6 @@ import {
   Calendar as CalendarIcon,
   PieChart,
   TrendingUp,
-  X,
 } from 'lucide-react-native';
 import {
   VictoryArea,
@@ -25,8 +24,10 @@ import {
   VictoryPie,
   VictoryTheme,
 } from 'victory-native';
-import { useFinance } from '../../src/contextos/FinanceContexto';
-import type { Transacao } from '../../src/tipos';
+import type { Transacao } from '../../types';
+import { buscarTransacoes } from '../../utils/requisicoes';
+import SeletorMesModal from '../../components/SeletorMesModal';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 type Aba = 'geral' | 'categorias' | 'tendencias';
 
@@ -62,7 +63,24 @@ const estiloEixoY = {
 };
 
 export default function Relatorios() {
-  const { transacoes, carregandoTransacoes, erroTransacoes } = useFinance();
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
+
+  async function carregarTransacoes() {
+    setCarregandoTransacoes(true);
+    try {
+      const usuario = await obterUsuarioDaSessao();
+      if (!usuario) throw new Error('Usuário não autenticado.');
+      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
+      setTransacoes(lista);
+      setErroTransacoes(null);
+    } catch (error) { console.error(error); setErroTransacoes('Não foi possível carregar as transações.'); }
+    finally { setCarregandoTransacoes(false); }
+  }
+
+  useEffect(() => { if (telaEmFoco) carregarTransacoes(); }, [telaEmFoco]);
   const [aba, setAba] = useState<Aba>('geral');
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const [mesSelecionado, setMesSelecionado] = useState<number>(new Date().getMonth());
@@ -374,44 +392,7 @@ export default function Relatorios() {
         </>
       )}
 
-      {/* ── MODAL CUSTOMIZADO DO CALENDÁRIO ── */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitulo}>Selecionar Mês</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <X size={20} color="#8E8E93" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.gridMeses}>
-              {MESES.map((mes, index) => {
-                const isSelected = index === mesSelecionado;
-                return (
-                  <TouchableOpacity
-                    key={mes}
-                    style={[styles.itemMes, isSelected && styles.itemMesAtivo]}
-                    onPress={() => {
-                      setMesSelecionado(index);
-                      setModalVisible(false);
-                    }}
-                  >
-                    <Text style={[styles.textoMes, isSelected && styles.textoMesAtivo]}>
-                      {mes}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <SeletorMesModal visivel={modalVisible} meses={MESES} mesSelecionado={mesSelecionado} fechar={() => setModalVisible(false)} selecionar={(indice) => { setMesSelecionado(indice); setModalVisible(false); }} />
     </ScrollView>
   );
 }
@@ -550,43 +531,4 @@ grid: {
   categoriaNome: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   categoriaValor: { fontSize: 12, color: '#64748B', marginTop: 4 },
 
-  /* Estilos do Modal de Calendário */
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '85%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 5,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitulo: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
-gridMeses: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  itemMes: {
-    flexBasis: '31%',
-    flexGrow: 0,
-    flexShrink: 1,
-    marginBottom: 8,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F2F2F7',
-    alignItems: 'center',
-  },
-  itemMesAtivo: { backgroundColor: '#1A9E75' },
-  textoMes: { fontSize: 13, fontWeight: '600', color: '#3A3A3C' },
-  textoMesAtivo: { color: '#FFFFFF' },
 });

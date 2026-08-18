@@ -7,8 +7,8 @@ if (!urlConfigurada || !chaveConfigurada) {
   throw new Error('Variáveis de ambiente do Supabase não configuradas.');
 }
 
-const SUPABASE_URL: string = urlConfigurada;
-const SUPABASE_ANON_KEY: string = chaveConfigurada;
+export const SUPABASE_URL: string = urlConfigurada;
+export const SUPABASE_ANON_KEY: string = chaveConfigurada;
 
 const CHAVE_SESSAO = '@edufinance:sessao-http';
 const MARGEM_EXPIRACAO_MS = 60 * 1000;

@@ -10,12 +10,19 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { useNotificacoes } from '../contextos/NotificacoesContexto';
-import type { Notificacao } from '../tipos';
+import type { Notificacao } from '../types';
+
+type Resultado = { sucesso: boolean; mensagem: string };
 
 type Props = {
   visivel: boolean;
   onFechar: () => void;
+  notificacoes: Notificacao[];
+  carregando: boolean;
+  erro: string | null;
+  marcarLida: (id: string) => Promise<Resultado>;
+  marcarTodasLidas: () => Promise<Resultado>;
+  excluir: (id: string) => Promise<Resultado>;
 };
 
 const CORES_TIPO: { [key: string]: { fundo: string; cor: string } } = {
@@ -46,9 +53,16 @@ function formatarTempo(criadaEm: string): string {
   return `${dias} d atrás`;
 }
 
-export default function NotificacoesModal({ visivel, onFechar }: Props) {
-  const { notificacoes, carregando, erro, marcarLida, marcarTodasLidas, excluir } =
-    useNotificacoes();
+export default function NotificacoesModal({
+  visivel,
+  onFechar,
+  notificacoes,
+  carregando,
+  erro,
+  marcarLida,
+  marcarTodasLidas,
+  excluir,
+}: Props) {
   const [marcandoId, setMarcandoId] = useState<string | null>(null);
   const [marcandoTodas, setMarcandoTodas] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);

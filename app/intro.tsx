@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { BookOpen, LineChart, PiggyBank, Sparkles, Target, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { obterSessaoValida } from '../utils/sessao';
 
 const RECURSOS = [
   {
@@ -29,7 +30,10 @@ const RECURSOS = [
 export default function Intro() {
   const router = useRouter();
 
-  const irPara = () => router.replace('/telalogin');
+  const irPara = async () => {
+    const sessao = await obterSessaoValida();
+    router.replace(sessao ? '/(tabs)' : '/login');
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

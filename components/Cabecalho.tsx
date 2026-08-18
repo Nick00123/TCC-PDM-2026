@@ -1,11 +1,29 @@
 import { Bell } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useNotificacoes } from '../contextos/NotificacoesContexto';
 import NotificacoesModal from './NotificacoesModal';
+import type { Notificacao } from '../types';
 
-export default function Cabecalho() {
-  const { naoLidas } = useNotificacoes();
+type Resultado = { sucesso: boolean; mensagem: string };
+
+type Props = {
+  notificacoes: Notificacao[];
+  carregando: boolean;
+  erro: string | null;
+  marcarLida: (id: string) => Promise<Resultado>;
+  marcarTodasLidas: () => Promise<Resultado>;
+  excluir: (id: string) => Promise<Resultado>;
+};
+
+export default function Cabecalho({
+  notificacoes,
+  carregando,
+  erro,
+  marcarLida,
+  marcarTodasLidas,
+  excluir,
+}: Props) {
+  const naoLidas = notificacoes.filter((item) => !item.lida).length;
   const [modalAberto, setModalAberto] = useState(false);
 
   return (
@@ -33,6 +51,12 @@ export default function Cabecalho() {
       <NotificacoesModal
         visivel={modalAberto}
         onFechar={() => setModalAberto(false)}
+        notificacoes={notificacoes}
+        carregando={carregando}
+        erro={erro}
+        marcarLida={marcarLida}
+        marcarTodasLidas={marcarTodasLidas}
+        excluir={excluir}
       />
     </View>
   );

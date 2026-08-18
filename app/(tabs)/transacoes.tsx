@@ -1,9 +1,12 @@
-import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2, X } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useFinance } from '../../src/contextos/FinanceContexto';
-import type { Transacao } from '../../src/tipos';
-import { corDaCategoria, formatarData, normalizarData } from '../../src/utils/formatacao';
+import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2 } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import FormularioTransacao from '../../components/FormularioTransacao';
+import type { Transacao } from '../../types';
+import { corDaCategoria, formatarData, normalizarData } from '../../utils/formatacao';
+import { buscarTransacoes, criarTransacao, excluirTransacao } from '../../utils/requisicoes';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 type Filtro = 'todos' | 'receitas' | 'despesas';
 type TipoModal = 'receita' | 'despesa' | null;
@@ -26,13 +29,10 @@ function dataValida(data: string) {
 }
 
 export default function Transacoes() {
-  const {
-    transacoes,
-    carregandoTransacoes,
-    erroTransacoes,
-    adicionarTransacao,
-    removerTransacao,
-  } = useFinance();
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busca, setBusca] = useState('');
   const [modalTipo, setModalTipo] = useState<TipoModal>(null);
@@ -43,6 +43,42 @@ export default function Transacoes() {
   const [data, setData] = useState(new Date().toISOString().split('T')[0]);
   const [salvando, setSalvando] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
+
+  async function carregarTransacoes() {
+    setCarregandoTransacoes(true);
+    try {
+      const usuario = await obterUsuarioDaSessao();
+      if (!usuario) throw new Error('Usuário não autenticado.');
+      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
+      setTransacoes(lista);
+      setErroTransacoes(null);
+    } catch (error) {
+      console.error('Erro ao carregar transações:', error);
+      setErroTransacoes('Não foi possível carregar as transações.');
+    } finally {
+      setCarregandoTransacoes(false);
+    }
+  }
+
+  useEffect(() => {
+    if (telaEmFoco) carregarTransacoes();
+  }, [telaEmFoco]);
+
+  async function adicionarTransacao(nova: Omit<Transacao, 'id'>) {
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    await criarTransacao(usuario.id, nova, await headersAutenticados());
+    await carregarTransacoes();
+    return { sucesso: true, mensagem: '' };
+  }
+
+  async function removerTransacao(id: string) {
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    await excluirTransacao(usuario.id, id, await headersAutenticados());
+    await carregarTransacoes();
+    return { sucesso: true, mensagem: '' };
+  }
 
   const transacoesFiltradas = transacoes
     .filter((t: Transacao) => {
@@ -286,67 +322,7 @@ export default function Transacoes() {
         ))}
       </ScrollView>
 
-      {/* Modal de Adicionar */}
-      <Modal visible={modalTipo !== null} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitulo}>
-                {modalTipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}
-              </Text>
-              <TouchableOpacity onPress={limparForm} disabled={salvando}>
-                <X size={22} color="#666" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.label}>Valor (R$)</Text>
-            <TextInput
-              style={styles.inputValor}
-              placeholder="0,00"
-              keyboardType="decimal-pad"
-              value={valor}
-              onChangeText={setValor}
-            />
-
-            <Text style={styles.label}>Descrição</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Mercado"
-              value={descricao}
-              onChangeText={setDescricao}
-            />
-
-            <Text style={styles.label}>Categoria</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorias}>
-              {categorias.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[styles.categoriaChip, categoria === c && styles.categoriaChipAtivo]}
-                  onPress={() => setCategoria(c)}
-                >
-                  <Text style={[styles.categoriaTexto, categoria === c && styles.categoriaTextoAtivo]}>
-                    {c}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.btnSalvar, { backgroundColor: modalTipo === 'receita' ? '#0D9488' : '#E11D48' }]}
-              onPress={salvar}
-              disabled={salvando}
-            >
-              <Text style={styles.btnSalvarTexto}>
-                {salvando
-                  ? 'Salvando...'
-                  : `✓ Adicionar ${modalTipo === 'receita' ? 'Receita' : 'Despesa'}`}
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-        </View>
-      </Modal>
+      <FormularioTransacao tipo={modalTipo} valor={valor} descricao={descricao} categoria={categoria} categorias={categorias} salvando={salvando} setValor={setValor} setDescricao={setDescricao} setCategoria={setCategoria} fechar={limparForm} salvar={salvar} />
 
     </View>
   );
@@ -456,58 +432,4 @@ const styles = StyleSheet.create({
   itemCat: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
   itemValor: { fontSize: 15, fontWeight: 'bold', marginRight: 12 },
   btnLixeira: { padding: 4 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitulo: { fontSize: 18, fontWeight: 'bold' },
-  label: { fontSize: 13, color: '#64748B', fontWeight: '600', marginBottom: 6 },
-  inputValor: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#0D9488',
-    marginBottom: 20,
-    padding: 8,
-  },
-  input: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    marginBottom: 16,
-  },
-  categorias: { marginBottom: 20 },
-  categoriaChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    marginRight: 8,
-  },
-  categoriaChipAtivo: { backgroundColor: '#0D9488' },
-  categoriaTexto: { color: '#64748B', fontWeight: '600' },
-  categoriaTextoAtivo: { color: '#fff' },
-  btnSalvar: {
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnSalvarTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

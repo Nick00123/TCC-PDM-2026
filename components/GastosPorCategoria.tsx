@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryPie } from 'victory-native';
-import type { Transacao } from '../tipos';
+import type { Transacao } from '../types';
 
 const CORES = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 

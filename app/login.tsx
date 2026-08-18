@@ -15,14 +15,11 @@ import {
 } from 'react-native';
 import {
   criarSessao,
-  endpointAuth,
-  endpointRest,
   headersAutenticados,
-  headersPublicos,
   salvarSessao,
-} from '../src/api/sessao';
-import Botao from '../src/componentes/Botao';
-import { useAuth } from '../src/contextos/AuthContexto';
+} from '../utils/sessao';
+import Botao from '../components/Botao';
+import { enviarAutenticacao, salvarPerfil } from '../utils/requisicoes';
 
 function mensagemDeErro(erro: any): string {
   const mensagem = erro?.msg || erro?.error_description || erro?.message || erro?.error || '';
@@ -48,7 +45,6 @@ export default function App() {
   const [verSenha, setVerSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const router = useRouter();
-  const { entrarComSessao } = useAuth();
 
   const confirmar = async () => {
     if (!gmail || !senha) {
@@ -64,21 +60,14 @@ export default function App() {
 
     try {
       const email = gmail.trim().toLowerCase();
-      const resposta = await fetch(
-        endpointAuth(aba === 'entrar' ? 'token?grant_type=password' : 'signup'),
-        {
-          method: 'POST',
-          headers: headersPublicos(),
-          body: JSON.stringify(
-            aba === 'entrar'
-              ? { email, password: senha }
-              : { email, password: senha, data: { nome: nome.trim() } }
-          ),
-        }
+      const { ok, corpo: dados } = await enviarAutenticacao(
+        aba === 'entrar' ? 'token?grant_type=password' : 'signup',
+        aba === 'entrar'
+          ? { email, password: senha }
+          : { email, password: senha, data: { nome: nome.trim() } }
       );
-      const dados = await resposta.json();
 
-      if (!resposta.ok) {
+      if (!ok) {
         Alert.alert(
           aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
           mensagemDeErro(dados)
@@ -105,20 +94,13 @@ export default function App() {
       }
 
       await salvarSessao(sessao);
-      entrarComSessao(sessao);
 
       if (aba === 'criar') {
-        const perfilResposta = await fetch(endpointRest('perfis?on_conflict=id'), {
-          method: 'POST',
-          headers: {
-            ...(await headersAutenticados()),
-            Prefer: 'resolution=merge-duplicates,return=minimal',
-          },
-          body: JSON.stringify({
-            id: sessao.user.id,
-            nome: nome.trim(),
-          }),
-        });
+        const perfilResposta = await salvarPerfil(
+          sessao.user.id,
+          nome.trim(),
+          await headersAutenticados()
+        );
 
         if (!perfilResposta.ok) {
           console.error('Erro ao criar perfil:', await perfilResposta.text());
@@ -129,7 +111,7 @@ export default function App() {
         }
       }
 
-      router.replace('/');
+      router.replace('/(tabs)');
     } catch (erro) {
       Alert.alert(
         aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
@@ -171,7 +153,7 @@ export default function App() {
                 Entrar
               </Text>
             </Pressable>
-
+            
             <Pressable
               style={[styles.aba, aba === 'criar' && styles.abaAtiva]}
               onPress={() => setAba('criar')}
@@ -234,19 +216,12 @@ export default function App() {
                   }
                   try {
                     const redirectTo = encodeURIComponent('com.edufinance.app://reset');
-                    const resposta = await fetch(
-                      endpointAuth(`recover?redirect_to=${redirectTo}`),
-                      {
-                        method: 'POST',
-                        headers: headersPublicos(),
-                        body: JSON.stringify({
-                          email: gmail.trim().toLowerCase(),
-                        }),
-                      }
+                    const { ok, corpo: dados } = await enviarAutenticacao(
+                      `recover?redirect_to=${redirectTo}`,
+                      { email: gmail.trim().toLowerCase() }
                     );
-                    const dados = await resposta.json();
 
-                    if (!resposta.ok) {
+                    if (!ok) {
                       Alert.alert('Erro', mensagemDeErro(dados));
                       return;
                     }

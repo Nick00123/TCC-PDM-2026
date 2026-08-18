@@ -1,19 +1,18 @@
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useFinance } from '../../src/contextos/FinanceContexto';
-import type { Meta } from '../../src/tipos';
-import { formatarMoeda } from '../../src/utils/formatacao';
+import { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ModalDeposito, ModalNovaMeta } from '../../components/MetasModais';
+import type { Meta } from '../../types';
+import { formatarMoeda } from '../../utils/formatacao';
+import { atualizarValorMeta, buscarMetas, consultarValoresMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 export default function Metas() {
-  const {
-  metas,
-  adicionarMeta,
-  depositar,
-  excluirMeta,
-  carregandoMetas,
-  erroMetas,
-} = useFinance();
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [carregandoMetas, setCarregandoMetas] = useState(true);
+  const [erroMetas, setErroMetas] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
   const [metaSelecionada, setMetaSelecionada] = useState<string | null>(null);
   const [valorDeposito, setValorDeposito] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
@@ -22,6 +21,54 @@ export default function Metas() {
   const [salvando, setSalvando] = useState(false);
   const [depositando, setDepositando] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
+
+  async function carregarMetas() {
+    setCarregandoMetas(true);
+    try {
+      const usuario = await obterUsuarioDaSessao();
+      if (!usuario) throw new Error('Usuário não autenticado.');
+      const lista = await buscarMetas(usuario.id, await headersAutenticados());
+      setMetas(lista);
+      setErroMetas(null);
+    } catch (error) {
+      console.error('Erro ao carregar metas:', error);
+      setErroMetas('Não foi possível carregar as metas.');
+    } finally {
+      setCarregandoMetas(false);
+    }
+  }
+
+  useEffect(() => {
+    if (telaEmFoco) carregarMetas();
+  }, [telaEmFoco]);
+
+  async function adicionarMeta(nome: string, objetivo: number) {
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    await criarMeta(usuario.id, nome, objetivo, await headersAutenticados());
+    await carregarMetas();
+    return { sucesso: true, mensagem: '' };
+  }
+
+  async function excluirMeta(id: string) {
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    await excluirMetaNoBanco(usuario.id, id, await headersAutenticados());
+    await carregarMetas();
+    return { sucesso: true, mensagem: '' };
+  }
+
+  async function depositar(id: string, valor: number) {
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    const headers = await headersAutenticados();
+    const registro = await consultarValoresMeta(usuario.id, id, headers);
+    if (!registro) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
+    const novoValor = Number(registro.valor_atual) + valor;
+    await atualizarValorMeta(usuario.id, id, novoValor, headers);
+    await carregarMetas();
+    return { sucesso: true, mensagem: '' };
+  }
 
   const metasAndamento = (metas ?? []).filter(
     (m: Meta) => m.atual < m.total
@@ -256,69 +303,8 @@ if (carregandoMetas) {
         </View>
       )}
 
-      {/* Modal nova meta */}
-      <Modal visible={modalAberto} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitulo}>Nova Meta</Text>
-
-            <Text style={styles.label}>Nome da meta</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Viagem para Europa"
-              value={titulo}
-              onChangeText={setTitulo}
-            />
-
-            <Text style={styles.label}>Valor necessário (R$)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: 8000,00"
-              keyboardType="decimal-pad"
-              value={total}
-              onChangeText={setTotal}
-            />
-
-            <TouchableOpacity style={styles.btnSalvar} onPress={salvar} disabled={salvando}>
-              <Text style={styles.btnSalvarTexto}>{salvando ? 'Salvando...' : 'Criar Meta'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.btnCancelar} onPress={() => setModalAberto(false)} disabled={salvando}>
-              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modal depositar */}
-      <Modal visible={metaSelecionada !== null} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitulo}>Depositar</Text>
-
-            <Text style={styles.label}>Valor (R$)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0,00"
-              keyboardType="decimal-pad"
-              value={valorDeposito}
-              onChangeText={setValorDeposito}
-            />
-
-            <TouchableOpacity
-              style={styles.btnSalvar}
-              onPress={confirmarDeposito}
-              disabled={depositando}
-            >
-              <Text style={styles.btnSalvarTexto}>{depositando ? 'Depositando...' : 'Confirmar'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.btnCancelar} onPress={() => setMetaSelecionada(null)} disabled={depositando}>
-              <Text style={styles.btnCancelarTexto}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <ModalNovaMeta visivel={modalAberto} titulo={titulo} total={total} salvando={salvando} setTitulo={setTitulo} setTotal={setTotal} salvar={salvar} fechar={() => setModalAberto(false)} />
+      <ModalDeposito visivel={metaSelecionada !== null} valor={valorDeposito} depositando={depositando} setValor={setValorDeposito} confirmar={confirmarDeposito} fechar={() => setMetaSelecionada(null)} />
 
     </ScrollView>
   );
@@ -415,35 +401,4 @@ const styles = StyleSheet.create({
   vazioIcone: { fontSize: 48, marginBottom: 16 },
   vazioTitulo: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
   vazioSubtitulo: { fontSize: 14, color: '#888', textAlign: 'center' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalTitulo: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  label: { fontSize: 13, color: '#888', fontWeight: '600', marginBottom: 6 },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    marginBottom: 16,
-  },
-  btnSalvar: {
-    backgroundColor: '#1A9E75',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  btnSalvarTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  btnCancelar: { padding: 12, alignItems: 'center' },
-  btnCancelarTexto: { color: '#888', fontSize: 15 },
 });

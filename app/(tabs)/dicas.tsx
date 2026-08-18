@@ -1,8 +1,10 @@
 import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp, X } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useFinance } from '../../src/contextos/FinanceContexto';
-import type { Transacao } from '../../src/tipos';
+import type { Transacao } from '../../types';
+import { buscarTransacoes } from '../../utils/requisicoes';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 type Dica = {
   id: string;
@@ -167,13 +169,26 @@ const CORES_TEXTO: { [key: string]: string } = {
 };
 
 export default function Dicas() {
-  const {
-    transacoes,
-    totalReceitas,
-    totalDespesas,
-    carregandoTransacoes,
-    erroTransacoes,
-  } = useFinance();
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
+  const totalReceitas = transacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
+  const totalDespesas = transacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+
+  async function carregarTransacoes() {
+    setCarregandoTransacoes(true);
+    try {
+      const usuario = await obterUsuarioDaSessao();
+      if (!usuario) throw new Error('Usuário não autenticado.');
+      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
+      setTransacoes(lista);
+      setErroTransacoes(null);
+    } catch (error) { console.error(error); setErroTransacoes('Não foi possível carregar as transações.'); }
+    finally { setCarregandoTransacoes(false); }
+  }
+
+  useEffect(() => { if (telaEmFoco) carregarTransacoes(); }, [telaEmFoco]); //Toda vez que o usuário entra ou volta para esta tela, o sistema verifica o foco e recarrega as transações do banco de dados para garantir que os dados estejam sempre atualizados.
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
 
   // Lógica da dica personalizada

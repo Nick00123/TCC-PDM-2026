@@ -1,14 +1,17 @@
-import EvolucaoMensal from '@/src/componentes/EvolucaoMensal';
-import GastosPorCategoria from '@/src/componentes/GastosPorCategoria';
+import EvolucaoMensal from '@/components/EvolucaoMensal';
+import GastosPorCategoria from '@/components/GastosPorCategoria';
 import { router } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react-native';
-import AcoesRapidas from '../../src/componentes/AcoesRapidas';
-import BalanceCard from '../../src/componentes/BalanceCard';
-import Cabecalho from '../../src/componentes/Cabecalho';
-import MetaCard from '../../src/componentes/MetaCard';
-import TransacaoItem from '../../src/componentes/TransacaoItem';
-import { useFinance } from '../../src/contextos/FinanceContexto';
-import type { Meta, Transacao } from '../../src/tipos';
+import AcoesRapidas from '../../components/AcoesRapidas';
+import BalanceCard from '../../components/BalanceCard';
+import Cabecalho from '../../components/Cabecalho';
+import MetaCard from '../../components/MetaCard';
+import TransacaoItem from '../../components/TransacaoItem';
+import type { Meta, Notificacao, Transacao } from '../../types';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { alterarNotificacoes, buscarMetas, buscarNotificacoes, buscarTransacoes, criarNotificacao } from '../../utils/requisicoes';
 
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -17,15 +20,70 @@ const LIMITE_METAS = 5;
 const LIMITE_TRANSACOES = 5;
 
 export default function Home() {
-  const {
-    saldoTotal,
-    totalReceitas,
-    totalDespesas,
-    transacoes,
-    carregandoTransacoes,
-    erroTransacoes,
-    metas,
-  } = useFinance();
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
+  const [carregandoNotificacoes, setCarregandoNotificacoes] = useState(true);
+  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const [erroNotificacoes, setErroNotificacoes] = useState<string | null>(null);
+  const telaEmFoco = useIsFocused();
+
+  async function carregarDados() {
+    setCarregandoTransacoes(true);
+    setCarregandoNotificacoes(true);
+    try {
+      const usuario = await obterUsuarioDaSessao();
+      if (!usuario) { router.replace('/login'); return; }
+      const headers = await headersAutenticados();
+      const [listaTransacoes, listaMetas] = await Promise.all([
+        buscarTransacoes(usuario.id, headers),
+        buscarMetas(usuario.id, headers),
+      ]);
+      setTransacoes(listaTransacoes);
+      setMetas(listaMetas);
+      setErroTransacoes(null);
+
+      // Cria os avisos essenciais ao abrir o dashboard.
+      for (const meta of listaMetas) {
+        if (meta.atual >= meta.total) {
+          await criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${meta.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${meta.id}` }, headers);
+        }
+      }
+
+      const receitas = listaTransacoes.filter((item: any) => item.tipo === 'receita').reduce((total: number, item: any) => total + Number(item.valor), 0);
+      const despesas = listaTransacoes.filter((item: any) => item.tipo === 'despesa').reduce((total: number, item: any) => total + Number(item.valor), 0);
+      if (despesas > receitas) {
+        const dataAtual = new Date().toISOString().split('T')[0];
+        await criarNotificacao({ usuario_id: usuario.id, titulo: 'Atenção ao saldo', mensagem: 'Suas despesas estão maiores que suas receitas.', tipo: 'alerta', lida: false, chave_evento: `saldo_negativo:${dataAtual}` }, headers);
+      }
+
+      setNotificacoes(await buscarNotificacoes(usuario.id, headers));
+      setErroNotificacoes(null);
+    } catch (error) {
+      console.error('Erro ao carregar dashboard:', error);
+      setErroTransacoes('Não foi possível carregar o resumo.');
+    } finally {
+      setCarregandoTransacoes(false);
+      setCarregandoNotificacoes(false);
+    }
+  }
+
+  useEffect(() => { if (telaEmFoco) carregarDados(); }, [telaEmFoco]);
+
+  async function alterarNotificacao(caminho: string, metodo: 'PATCH' | 'DELETE') {
+    await alterarNotificacoes(caminho, metodo, await headersAutenticados());
+    await carregarDados();
+    return { sucesso: true, mensagem: '' };
+  }
+
+  async function marcarLida(id: string) { return alterarNotificacao(`notificacoes?id=eq.${encodeURIComponent(id)}`, 'PATCH'); }
+  async function marcarTodasLidas() { return alterarNotificacao('notificacoes?lida=eq.false', 'PATCH'); }
+  async function excluirNotificacao(id: string) { return alterarNotificacao(`notificacoes?id=eq.${encodeURIComponent(id)}`, 'DELETE'); }
+
+  const totalReceitas = transacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
+  const totalDespesas = transacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+  const saldoTotal = totalReceitas - totalDespesas;
 
   const metasEmAndamento = metas.filter((meta: Meta) => meta.atual < meta.total);
   const metasVisiveis = metasEmAndamento.slice(0, LIMITE_METAS);
@@ -33,7 +91,7 @@ export default function Home() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Cabecalho />
+      <Cabecalho notificacoes={notificacoes} carregando={carregandoNotificacoes} erro={erroNotificacoes} marcarLida={marcarLida} marcarTodasLidas={marcarTodasLidas} excluir={excluirNotificacao} />
       {carregandoTransacoes ? (
         <View style={styles.aviso}><Text style={styles.avisoTexto}>Carregando resumo financeiro...</Text></View>
       ) : erroTransacoes ? (
