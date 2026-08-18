@@ -133,7 +133,7 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         <Image
-          source={require('../assets/images/logo.png')}
+          source={require('../assets/images/logo.edufinance.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -153,7 +153,7 @@ export default function App() {
                 Entrar
               </Text>
             </Pressable>
-            
+
             <Pressable
               style={[styles.aba, aba === 'criar' && styles.abaAtiva]}
               onPress={() => setAba('criar')}

@@ -40,7 +40,7 @@ export default function Intro() {
       {/* Logo + Título */}
       <View style={styles.top}>
         <Image
-          source={require('../assets/images/logo.png')}
+          source={require('../assets/images/logo.edufinance.png')}
           style={styles.logo}
           resizeMode="contain"
         />
