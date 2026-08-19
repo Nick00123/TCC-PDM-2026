@@ -133,7 +133,7 @@ export default function App() {
         showsVerticalScrollIndicator={false}
       >
         <Image
-          source={require('../assets/images/logo.edufinance.png')}
+          source={require('../assets/images/fundoTransparante.png')}
           style={styles.logo}
           resizeMode="contain"
         />

@@ -4,7 +4,7 @@
     "slug": "edufinance",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logininicial.png",
+    "icon": "./assets/images/logo.edufinance.png",
     "scheme": "edufinance",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
