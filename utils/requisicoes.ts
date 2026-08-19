@@ -1,5 +1,5 @@
 import type { Meta, Notificacao, Transacao } from '../types';
-import { endpointAuth, endpointRest, headersPublicos } from './sessao';
+import { endpointAuth, endpointRest, headersAutenticados, headersPublicos, SUPABASE_URL } from './sessao';
 
 type Headers = Record<string, string>;
 
@@ -11,7 +11,7 @@ async function lerResposta(resposta: Response) {
   return resposta;
 }
 
-export async function buscarTransacoes(usuarioId: string, headers: Headers) {
+export async function buscarTransacoes(usuarioId: string, headers: Headers): Promise<Transacao[]> {
   const caminho = `transacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=data.desc`;
   const resposta = await lerResposta(await fetch(endpointRest(caminho), { headers }));
   const lista = await resposta.json();
@@ -39,7 +39,7 @@ export async function excluirTransacao(usuarioId: string, id: string, headers: H
   await lerResposta(await fetch(endpointRest(caminho), { method: 'DELETE', headers }));
 }
 
-export async function buscarMetas(usuarioId: string, headers: Headers) {
+export async function buscarMetas(usuarioId: string, headers: Headers): Promise<Meta[]> {
   const caminho = `metas?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`;
   const resposta = await lerResposta(await fetch(endpointRest(caminho), { headers }));
   const lista = await resposta.json();
@@ -142,4 +142,47 @@ export async function salvarPerfil(usuarioId: string, nome: string, headers: Hea
     headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ id: usuarioId, nome }),
   });
+}
+
+export type ContextoAnalise = {
+  receitas: number;
+  despesas: number;
+  metas: object[];
+  dicasDisponiveis: object[];
+};
+
+export async function pedirAnalise(contexto: ContextoAnalise): Promise<string> {
+  const prompt = `
+Você é um mentor financeiro educativo, empático e objetivo do app EduFinance.
+Analise somente os dados fornecidos. Não invente valores nem prometa rendimentos.
+Produza uma resposta curta, em português do Brasil, com no máximo 80 palavras.
+Indique uma ação que possa ser feita no app e recomende exatamente um conteúdo
+presente em "dicasDisponiveis".
+
+Responda obrigatoriamente neste formato, sem JSON e sem introdução:
+Situação Atual: <uma frase sobre receitas, despesas e saldo>
+Recomendação: <uma orientação prática e educativa>
+Sugestão de Conteúdo: <título exato de uma dica ou vídeo disponível>
+
+Dados financeiros atuais:
+${JSON.stringify(contexto)}
+  `.trim();
+
+  const resposta = await fetch(`${SUPABASE_URL}/functions/v1/bright-endpoint`, {
+    method: 'POST',
+    headers: await headersAutenticados(),
+    body: JSON.stringify({ prompt, contexto }),
+  });
+
+  if (!resposta.ok) {
+    const detalhe = await resposta.text();
+    throw new Error(`Falha ao analisar dados (${resposta.status}): ${detalhe}`);
+  }
+
+  const corpo = (await resposta.json()) as { resposta?: unknown };
+  if (typeof corpo.resposta !== 'string' || !corpo.resposta.trim()) {
+    throw new Error('A Edge Function retornou uma análise inválida.');
+  }
+
+  return corpo.resposta.trim();
 }

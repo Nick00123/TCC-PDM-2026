@@ -1,106 +1,45 @@
-import { Brain, DollarSign, Lightbulb, Play, Puzzle, Ruler, Shield, Target, TrendingUp, X } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, TrendingUp, X } from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useIsFocused } from '@react-navigation/native';
-import { ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { Transacao } from '../../types';
-import { buscarTransacoes } from '../../utils/requisicoes';
-import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import type { Meta, Transacao } from '../../types';
+import { buscarMetas, buscarTransacoes, pedirAnalise } from '../../utils/requisicoes';
+import { endpointRest, headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 type Dica = {
   id: string;
   titulo: string;
   descricao: string;
-  categoria: 'Educação' | 'Investimento' | 'Comportamento' | 'Segurança' | 'Crédito';
-  icone: React.ReactNode;
-  conteudo: string[];
+  categoria: string;
+  conteudo: string;
+  created_at: string;
 };
 
-const DICAS: Dica[] = [
-  {
-    id: '1',
-    titulo: 'Regra 50-30-20',
-    descricao: 'Necessidades 50%, desejos 30%, poupança/investimento 20%. Simples e eficaz para qualquer renda.',
-    categoria: 'Educação',
-    icone: <Ruler size={28} color="#1A9E75" />,
-    conteudo: [
-      'A regra 50-30-20 é um método simples de orçamento criado pela senadora Elizabeth Warren.',
-      '50% da sua renda deve ir para necessidades: moradia, contas, alimentação, transporte.',
-      '30% para desejos: lazer, restaurantes, assinaturas, viagens.',
-      '20% para poupança e investimentos: o famoso "pague-se primeiro".',
-      'Dica: ajuste os percentuais conforme sua realidade, mas mantenha a disciplina de separar pelo menos 20% para poupar.',
-    ],
-  },
-  {
-    id: '2',
-    titulo: 'Juros compostos',
-    descricao: 'R$ 200/mês investidos a 10% ao ano por 10 anos viram mais de R$ 38.000. Comece cedo!',
-    categoria: 'Investimento',
-    icone: <TrendingUp size={28} color="#1A9E75" />,
-    conteudo: [
-      'Juros compostos são os "juros sobre juros": o rendimento do mês se soma ao valor e volta a render no mês seguinte.',
-      'O grande segredo é o TEMPO. Quanto mais cedo você começa, maior o efeito da bola de neve.',
-      'Exemplo: investir R$ 200/mês a 1% ao mês por 10 anos gera cerca de R$ 46.000, sendo R$ 24.000 de aportes e R$ 22.000 de juros.',
-      'A constância vence o valor: R$ 50 todo mês rende mais que R$ 500 de vez em quando.',
-      'Aplicação prática: invista de forma automática todo mês e não interrompa nos primeiros meses ruins.',
-    ],
-  },
-  {
-    id: '3',
-    titulo: 'Compra por impulso',
-    descricao: 'Espere 24h antes de qualquer compra não planejada. Você vai se surpreender com quantas vontades passam!',
-    categoria: 'Comportamento',
-    icone: <Brain size={28} color="#6A1B9A" />,
-    conteudo: [
-      'Compras por impulso são responsáveis por grande parte do descontrole financeiro.',
-      'A regra das 24 horas: ao sentir vontade de comprar algo não planejado, espere um dia.',
-      'Na maioria das vezes, a "vontade" passa e você percebe que não precisava daquilo.',
-      'Dica extra: liste o que você quer comprar e revise a lista após 1 semana. Só compre o que ainda fizer sentido.',
-      'Evite salvar cartão em lojas online e desinstale apps de compras se necessário.',
-    ],
-  },
-  {
-    id: '4',
-    titulo: 'Fundo de emergência',
-    descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
-    categoria: 'Segurança',
-    icone: <Shield size={28} color="#1A9E75" />,
-    conteudo: [
-      'O fundo de emergência é o seu colchão de segurança para imprevistos.',
-      'Serve para: perda de emprego, problemas de saúde, consertos urgentes.',
-      'O ideal é guardar de 3 a 6 meses das suas despesas mensais.',
-      'Deixe esse dinheiro em um local seguro e de resgate rápido, como o Tesouro Selic ou CDB com liquidez diária.',
-      'Regra de ouro: NUNCA use esse dinheiro para viagens, compras ou vontades.',
-    ],
-  },
-  {
-    id: '5',
-    titulo: 'Como investir R$100/mês',
-    descricao: 'CDB, Tesouro Direto e fundos são boas opções para começar com pouco dinheiro.',
-    categoria: 'Investimento',
-    icone: <DollarSign size={28} color="#1A9E75" />,
-    conteudo: [
-      'Não precisa de muito dinheiro para começar a investir. R$100/mês já fazem diferença.',
-      'Tesouro Direto: título público, seguro e com opções para todos os perfis.',
-      'CDB: emitido por bancos, com proteção do FGC até R$250 mil por instituição.',
-      'Fundos de investimento: geridos por profissionais, com aporte inicial baixo.',
-      'Comece pelo Tesouro Selic (mais seguro) e vá estudando para expandir sua carteira.',
-    ],
-  },
-  {
-    id: '6',
-    titulo: 'Psicologia do dinheiro',
-    descricao: 'Nossas emoções afetam nossas decisões financeiras. Entender isso é o primeiro passo.',
-    categoria: 'Comportamento',
-    icone: <Puzzle size={28} color="#6A1B9A" />,
-    conteudo: [
-      'Nossas decisões financeiras são 80% comportamento e apenas 20% conhecimento.',
-      'Entenda seus gatilhos de consumo: estresse, ansiedade, comparação social.',
-      'Crie barreiras: defina limites de gasto, use dinheiro em espécie, evite parcelamentos longos.',
-      'Automatize suas finanças: poupe antes de gastar, com transferência automática.',
-      'Celebre pequenas vitórias: cada meta alcançada reforça o hábito saudável.',
-    ],
-  },
-];
+async function buscarDicas(): Promise<Dica[]> {
+  const resposta = await fetch(endpointRest('dicas?select=*&order=created_at.desc'), {
+    headers: await headersAutenticados(),
+  });
+
+  if (!resposta.ok) {
+    const detalhe = await resposta.text();
+    throw new Error(`Não foi possível buscar as dicas (${resposta.status}): ${detalhe}`);
+  }
+
+  return (await resposta.json()) as Dica[];
+}
+
+function iconeDaDica(categoria: string, tamanho = 28) {
+  const props = { size: tamanho, color: categoria === 'Comportamento' ? '#6A1B9A' : '#1A9E75' };
+  const icones: Record<string, React.ReactNode> = {
+    Educação: <Ruler {...props} />,
+    Investimento: <TrendingUp {...props} />,
+    Comportamento: <Brain {...props} />,
+    Segurança: <Shield {...props} />,
+    Crédito: <DollarSign {...props} />,
+    Empreendedorismo: <Puzzle {...props} />,
+  };
+  return icones[categoria] ?? <DollarSign {...props} />;
+}
 
 type Video = {
   id: string;
@@ -169,89 +108,89 @@ const CORES_TEXTO: { [key: string]: string } = {
 };
 
 export default function Dicas() {
+  const [dicas, setDicas] = useState<Dica[]>([]);
+  const [carregandoDicas, setCarregandoDicas] = useState(true);
+  const [erroDicas, setErroDicas] = useState<string | null>(null);
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
-  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
-  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [analise, setAnalise] = useState('');
+  const [carregandoAnalise, setCarregandoAnalise] = useState(true);
+  const [erroAnalise, setErroAnalise] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
+  const [mostrarTodas, setMostrarTodas] = useState(false);
+  const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
   const telaEmFoco = useIsFocused();
-  const totalReceitas = transacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
-  const totalDespesas = transacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
 
-  async function carregarTransacoes() {
-    setCarregandoTransacoes(true);
+  const carregarTela = useCallback(async () => {
+    setCarregandoDicas(true);
+    setCarregandoAnalise(true);
+    setErroDicas(null);
+    setErroAnalise(null);
+
+    let dicasDoBanco: Dica[];
+    try {
+      dicasDoBanco = await buscarDicas();
+      setDicas(dicasDoBanco);
+    } catch (error) {
+      console.error(error);
+      setErroDicas('Não foi possível carregar as dicas. Toque em atualizar para tentar novamente.');
+      setErroAnalise('A análise depende das dicas cadastradas e não pôde ser gerada agora.');
+      setCarregandoDicas(false);
+      setCarregandoAnalise(false);
+      return;
+    }
+    setCarregandoDicas(false);
+
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) throw new Error('Usuário não autenticado.');
-      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
-      setTransacoes(lista);
-      setErroTransacoes(null);
-    } catch (error) { console.error(error); setErroTransacoes('Não foi possível carregar as transações.'); }
-    finally { setCarregandoTransacoes(false); }
-  }
+      const headers = await headersAutenticados();
+      const [listaTransacoes, listaMetas] = await Promise.all([
+        buscarTransacoes(usuario.id, headers),
+        buscarMetas(usuario.id, headers),
+      ]);
+      const metasAtivas = listaMetas.filter((meta) => meta.atual < meta.total);
+      setTransacoes(listaTransacoes);
+      setMetas(metasAtivas);
 
-  useEffect(() => { if (telaEmFoco) carregarTransacoes(); }, [telaEmFoco]); //Toda vez que o usuário entra ou volta para esta tela, o sistema verifica o foco e recarrega as transações do banco de dados para garantir que os dados estejam sempre atualizados.
-  const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
+      const receitas = listaTransacoes
+        .filter((item) => item.tipo === 'receita')
+        .reduce((total, item) => total + item.valor, 0);
+      const despesas = listaTransacoes
+        .filter((item) => item.tipo === 'despesa')
+        .reduce((total, item) => total + item.valor, 0);
+      const dicasDisponiveis = dicasDoBanco.map(({ id, titulo, descricao, categoria }) => ({
+        id,
+        titulo,
+        descricao,
+        categoria,
+      }));
 
-  // Lógica da dica personalizada
-  const getDicaPersonalizada = () => {
-    if (totalDespesas > totalReceitas) {
-      return {
-        titulo: 'Atenção aos seus gastos!',
-        descricao: 'Suas despesas estão maiores que suas receitas. Tente reduzir gastos não essenciais e crie um orçamento mensal.',
-        icone: <Target size={22} color="#fff" />,
-      };
+      setAnalise(await pedirAnalise({ receitas, despesas, metas: metasAtivas, dicasDisponiveis }));
+    } catch (error) {
+      console.error(error);
+      setErroAnalise('Não foi possível gerar sua análise agora. Toque em atualizar para tentar novamente.');
+    } finally {
+      setCarregandoAnalise(false);
     }
+  }, []);
 
-    // Categoria com mais gastos
-    const categorias: { [key: string]: number } = {};
-    transacoes
-      .filter((t: Transacao) => t.tipo === 'despesa')
-      .forEach((t: Transacao) => {
-        categorias[t.categoria] = (categorias[t.categoria] || 0) + t.valor;
-      });
+  useEffect(() => {
+    if (telaEmFoco) carregarTela();
+  }, [telaEmFoco, carregarTela]);
 
-    const maiorCategoria = Object.entries(categorias).sort((a, b) => b[1] - a[1])[0];
+  const dicasFiltradas = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase('pt-BR');
+    if (!termo) return dicas;
+    return dicas.filter(({ titulo, descricao, categoria }) =>
+      `${titulo} ${descricao} ${categoria}`.toLocaleLowerCase('pt-BR').includes(termo)
+    );
+  }, [busca, dicas]);
 
-    if (maiorCategoria) {
-      const [nome, valor] = maiorCategoria;
-      const pct = Math.round((valor / totalDespesas) * 100);
-      if (pct > 50) {
-        return {
-          titulo: `Você gasta muito com ${nome}`,
-          descricao: `${pct}% das suas despesas são com ${nome}. Tente diversificar seus gastos e verificar onde pode economizar.`,
-          icone: <Lightbulb size={22} color="#fff" />,
-        };
-      }
-    }
-
-    const economia = totalReceitas - totalDespesas;
-    if (economia > 0) {
-      return {
-        titulo: 'Você está economizando!',
-        descricao: `Parabéns! Você economizou R$ ${economia.toFixed(2)} este mês. Que tal investir esse valor no Tesouro Direto?`,
-        icone: <Target size={22} color="#fff" />,
-      };
-    }
-
-    return {
-      titulo: 'Fundo de emergência',
-      descricao: 'Antes de investir, guarde de 3 a 6 meses de despesas em um local seguro e de fácil acesso.',
-      icone: <Shield size={22} color="#fff" />,
-    };
-  };
-
-  const dicaPersonalizada = carregandoTransacoes
-    ? {
-        titulo: 'Carregando seus dados',
-        descricao: 'Aguarde enquanto preparamos sua dica personalizada.',
-        icone: <Target size={22} color="#fff" />,
-      }
-    : erroTransacoes
-    ? {
-        titulo: 'Dica personalizada indisponível',
-        descricao: 'Não foi possível analisar seus dados agora. As dicas da Central de Aprendizado continuam disponíveis.',
-        icone: <Shield size={22} color="#fff" />,
-      }
-    : getDicaPersonalizada();
+  const buscaAtiva = busca.trim().length > 0;
+  const dicasVisiveis = buscaAtiva || mostrarTodas
+    ? dicasFiltradas
+    : dicasFiltradas.slice(0, 4);
 
   return (
     <ScrollView style={styles.container}>
@@ -264,31 +203,58 @@ export default function Dicas() {
 
       {/* Dica personalizada */}
       <View style={styles.dicaDestaque}>
-        <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-          <View style={styles.dicaIcone}>{dicaPersonalizada.icone}</View>
-          <Text style={styles.dicaDestaqueTitulo}>{dicaPersonalizada.titulo}</Text>
+        <View style={styles.destaqueCabecalho}>
+          <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
+          <TouchableOpacity
+            onPress={carregarTela}
+            disabled={carregandoAnalise || carregandoDicas}
+            accessibilityLabel="Atualizar análise financeira"
+            accessibilityHint={`Reanalisa ${transacoes.length} transações e ${metas.length} metas ativas`}
+          >
+            <RefreshCw size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
-        <Text style={styles.dicaDestaqueTexto}>{dicaPersonalizada.descricao}</Text>
+        {carregandoAnalise ? (
+          <View style={styles.carregandoDestaque}>
+            <ActivityIndicator color="#fff" />
+            <Text style={styles.dicaDestaqueTexto}>Analisando seu momento financeiro...</Text>
+          </View>
+        ) : (
+          <Text style={styles.dicaDestaqueTexto}>{erroAnalise ?? analise}</Text>
+        )}
+      </View>
+
+      <View style={styles.buscaContainer}>
+        <Search size={20} color="#64748B" />
+        <TextInput
+          value={busca}
+          onChangeText={setBusca}
+          placeholder="Buscar dicas por tema ou categoria"
+          placeholderTextColor="#94A3B8"
+          style={styles.buscaInput}
+          returnKeyType="search"
+        />
       </View>
 
       {/* Lista de dicas (clicáveis) */}
       <Text style={styles.secaoTitulo}>Central de Aprendizado</Text>
       <Text style={styles.secaoSubtitulo}>Toque em um card para ver o conteúdo completo</Text>
 
-      {DICAS.map(dica => (
+      {carregandoDicas && <ActivityIndicator color="#1A9E75" style={styles.carregandoLista} />}
+      {!carregandoDicas && erroDicas && <Text style={styles.erroLista}>{erroDicas}</Text>}
+      {!carregandoDicas && !erroDicas && dicasVisiveis.map(dica => (
         <TouchableOpacity
           key={dica.id}
           style={styles.dicaCard}
           onPress={() => setDicaAberta(dica)}
           activeOpacity={0.7}
         >
-          <View style={styles.dicaIcone}>{dica.icone}</View>
+          <View style={styles.dicaIcone}>{iconeDaDica(dica.categoria)}</View>
           <View style={styles.dicaInfo}>
             <View style={styles.dicaHeaderRow}>
               <Text style={styles.dicaTitulo}>{dica.titulo}</Text>
-              <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dica.categoria] }]}>
-                <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dica.categoria] }]}>
+              <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dica.categoria] ?? '#F1F5F9' }]}>
+                <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dica.categoria] ?? '#475569' }]}>
                   {dica.categoria}
                 </Text>
               </View>
@@ -298,6 +264,21 @@ export default function Dicas() {
           </View>
         </TouchableOpacity>
       ))}
+      {!carregandoDicas && !erroDicas && dicasFiltradas.length === 0 && (
+        <Text style={styles.semResultados}>Nenhuma dica encontrada.</Text>
+      )}
+      {!carregandoDicas && !erroDicas && !buscaAtiva && dicasFiltradas.length > 4 && (
+        <TouchableOpacity
+          style={styles.botaoVerMais}
+          onPress={() => setMostrarTodas((valorAtual) => !valorAtual)}
+          accessibilityRole="button"
+          accessibilityLabel={mostrarTodas ? 'Ver menos dicas' : 'Ver mais dicas'}
+        >
+          <Text style={styles.botaoVerMaisTexto}>
+            {mostrarTodas ? 'Ver menos' : 'Ver mais'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       {/* Seção de vídeos */}
       <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
@@ -345,7 +326,7 @@ export default function Dicas() {
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <View style={styles.modalIconeMesa}>
-                {dicaAberta?.icone}
+                {dicaAberta ? iconeDaDica(dicaAberta.categoria) : null}
               </View>
               <Text style={styles.modalTitulo}>{dicaAberta?.titulo}</Text>
               <TouchableOpacity onPress={() => setDicaAberta(null)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -353,8 +334,8 @@ export default function Dicas() {
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.badge, { backgroundColor: dicaAberta ? CORES_CATEGORIA[dicaAberta.categoria] : '#E8F5E9', alignSelf: 'flex-start', marginBottom: 12 }]}>
-              <Text style={[styles.badgeTexto, { color: dicaAberta ? CORES_TEXTO[dicaAberta.categoria] : '#2E7D32' }]}>
+            <View style={[styles.badge, { backgroundColor: dicaAberta ? (CORES_CATEGORIA[dicaAberta.categoria] ?? '#F1F5F9') : '#E8F5E9', alignSelf: 'flex-start', marginBottom: 12 }]}>
+              <Text style={[styles.badgeTexto, { color: dicaAberta ? (CORES_TEXTO[dicaAberta.categoria] ?? '#475569') : '#2E7D32' }]}>
                 {dicaAberta?.categoria}
               </Text>
             </View>
@@ -362,7 +343,7 @@ export default function Dicas() {
             <ScrollView style={styles.modalConteudo} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalDescricao}>{dicaAberta?.descricao}</Text>
               <View style={styles.modalDivisor} />
-              {dicaAberta?.conteudo.map((item, idx) => (
+              {dicaAberta?.conteudo.split(/\r?\n/).filter(Boolean).map((item, idx) => (
                 <View key={idx} style={styles.conteudoItem}>
                   <Text style={styles.conteudoBullet}>•</Text>
                   <Text style={styles.conteudoTexto}>{item}</Text>
@@ -401,8 +382,14 @@ const styles = StyleSheet.create({
   dicaDestaqueLabel: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
-    marginBottom: 8,
   },
+  destaqueCabecalho: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  carregandoDestaque: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dicaDestaqueTitulo: {
     color: '#fff',
     fontSize: 18,
@@ -414,6 +401,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  buscaContainer: {
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 1,
+  },
+  buscaInput: { flex: 1, paddingVertical: 13, paddingHorizontal: 10, color: '#1E293B' },
+  semResultados: { color: '#64748B', textAlign: 'center', marginVertical: 20 },
+  botaoVerMais: {
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  botaoVerMaisTexto: { color: '#1A9E75', fontSize: 14, fontWeight: '700' },
+  carregandoLista: { marginVertical: 24 },
+  erroLista: { color: '#B91C1C', textAlign: 'center', marginHorizontal: 24, marginVertical: 20 },
   secaoTitulo: {
   fontSize: 16,
   fontWeight: 'bold',
