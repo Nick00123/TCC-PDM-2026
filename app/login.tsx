@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
@@ -38,10 +39,13 @@ function mensagemDeErro(erro: any): string {
 }
 
 export default function App() {
+  const parametros = useLocalSearchParams<{ aba?: string }>();
   const [gmail, setGmail] = useState('');
   const [senha, setSenha] = useState('');
   const [nome, setNome] = useState('');
-  const [aba, setAba] = useState<'entrar' | 'criar'>('entrar');
+  const [aba, setAba] = useState<'entrar' | 'criar'>(
+    parametros.aba === 'criar' ? 'criar' : 'entrar'
+  );
   const [verSenha, setVerSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const router = useRouter();
@@ -215,7 +219,7 @@ export default function App() {
                     return;
                   }
                   try {
-                    const redirectTo = encodeURIComponent('com.edufinance.app://reset');
+                    const redirectTo = encodeURIComponent(Linking.createURL('/reset'));
                     const { ok, corpo: dados } = await enviarAutenticacao(
                       `recover?redirect_to=${redirectTo}`,
                       { email: gmail.trim().toLowerCase() }

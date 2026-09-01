@@ -44,22 +44,26 @@ export default function Home() {
       setMetas(listaMetas);
       setErroTransacoes(null);
 
-      // Cria os avisos essenciais ao abrir o dashboard.
-      for (const meta of listaMetas) {
-        if (meta.atual >= meta.total) {
-          await criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${meta.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${meta.id}` }, headers);
+      try {
+        const notificacoesPendentes = listaMetas
+          .filter((meta) => meta.atual >= meta.total)
+          .map((meta) => criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${meta.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${meta.id}` }, headers));
+
+        const receitas = listaTransacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
+        const despesas = listaTransacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+        if (despesas > receitas) {
+          const hojeLocal = new Date();
+          const dataAtual = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, '0')}-${String(hojeLocal.getDate()).padStart(2, '0')}`;
+          notificacoesPendentes.push(criarNotificacao({ usuario_id: usuario.id, titulo: 'Atenção ao saldo', mensagem: 'Suas despesas estão maiores que suas receitas.', tipo: 'alerta', lida: false, chave_evento: `saldo_negativo:${dataAtual}` }, headers));
         }
-      }
 
-      const receitas = listaTransacoes.filter((item: any) => item.tipo === 'receita').reduce((total: number, item: any) => total + Number(item.valor), 0);
-      const despesas = listaTransacoes.filter((item: any) => item.tipo === 'despesa').reduce((total: number, item: any) => total + Number(item.valor), 0);
-      if (despesas > receitas) {
-        const dataAtual = new Date().toISOString().split('T')[0];
-        await criarNotificacao({ usuario_id: usuario.id, titulo: 'Atenção ao saldo', mensagem: 'Suas despesas estão maiores que suas receitas.', tipo: 'alerta', lida: false, chave_evento: `saldo_negativo:${dataAtual}` }, headers);
+        await Promise.all(notificacoesPendentes);
+        setNotificacoes(await buscarNotificacoes(usuario.id, headers));
+        setErroNotificacoes(null);
+      } catch (error) {
+        console.error('Erro ao carregar notificações:', error);
+        setErroNotificacoes('Não foi possível carregar as notificações.');
       }
-
-      setNotificacoes(await buscarNotificacoes(usuario.id, headers));
-      setErroNotificacoes(null);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
       setErroTransacoes('Não foi possível carregar o resumo.');
@@ -72,7 +76,14 @@ export default function Home() {
   useEffect(() => { if (telaEmFoco) carregarDados(); }, [telaEmFoco]);
 
   async function alterarNotificacao(caminho: string, metodo: 'PATCH' | 'DELETE') {
-    await alterarNotificacoes(caminho, metodo, await headersAutenticados());
+    const usuario = await obterUsuarioDaSessao();
+    if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
+    const separador = caminho.includes('?') ? '&' : '?';
+    await alterarNotificacoes(
+      `${caminho}${separador}usuario_id=eq.${encodeURIComponent(usuario.id)}`,
+      metodo,
+      await headersAutenticados()
+    );
     await carregarDados();
     return { sucesso: true, mensagem: '' };
   }

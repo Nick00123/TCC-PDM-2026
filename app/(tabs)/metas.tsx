@@ -64,8 +64,9 @@ export default function Metas() {
     const headers = await headersAutenticados();
     const registro = await consultarValoresMeta(usuario.id, id, headers);
     if (!registro) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
-    const novoValor = Number(registro.valor_atual) + valor;
-    await atualizarValorMeta(usuario.id, id, novoValor, headers);
+    const valorAnterior = Number(registro.valor_atual);
+    const novoValor = valorAnterior + valor;
+    await atualizarValorMeta(usuario.id, id, valorAnterior, novoValor, headers);
     await carregarMetas();
     return { sucesso: true, mensagem: '' };
   }

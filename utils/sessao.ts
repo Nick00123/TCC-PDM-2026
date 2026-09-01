@@ -29,7 +29,7 @@ export type Sessao = {
 type RespostaRefresh = {
   access_token: string;
   refresh_token: string;
-  expires_in: number;
+  expires_in?: number;
   expires_at?: number;
   user?: Sessao['user'];
 };
@@ -55,7 +55,7 @@ export function criarSessao(dados: RespostaRefresh): Sessao | null {
   if (
     !dados.access_token ||
     !dados.refresh_token ||
-    !dados.expires_in ||
+    (!dados.expires_in && !dados.expires_at) ||
     !dados.user
   ) {
     return null;
@@ -66,7 +66,7 @@ export function criarSessao(dados: RespostaRefresh): Sessao | null {
     refreshToken: dados.refresh_token,
     expiresAt: dados.expires_at
       ? dados.expires_at * 1000
-      : Date.now() + dados.expires_in * 1000,
+      : Date.now() + (dados.expires_in ?? 3600) * 1000,
     user: dados.user,
   };
 }
@@ -175,17 +175,19 @@ export function diagnosticarErroJwt(
   resposta: Response,
   corpoErro: string,
   authorization: string
-): void {
+): {
+  iatAdiantadoServidorSegundos: number | null;
+  iatAdiantadoClienteSegundos: number | null;
+} | null {
   const erroNormalizado = corpoErro.toLowerCase();
 
   if (
     !erroNormalizado.includes('pgrst303') &&
     !erroNormalizado.includes('jwt issued at future')
   ) {
-    return;
+    return null;
   }
 
-  let sub: string | number = 'indisponível';
   let iat: number | null = null;
   let exp: number | null = null;
 
@@ -208,9 +210,6 @@ export function diagnosticarErroJwt(
       );
       const payload = JSON.parse(payloadTexto);
 
-      if (typeof payload.sub === 'string' || typeof payload.sub === 'number') {
-        sub = payload.sub;
-      }
       if (typeof payload.iat === 'number') iat = payload.iat;
       if (typeof payload.exp === 'number') exp = payload.exp;
     }
@@ -223,20 +222,20 @@ export function diagnosticarErroJwt(
   const horarioServidor = dataServidor
     ? Math.floor(Date.parse(dataServidor) / 1000)
     : null;
+  const iatAdiantadoClienteSegundos = iat === null ? null : iat - agoraCliente;
+  const iatAdiantadoServidorSegundos =
+    iat === null || horarioServidor === null || Number.isNaN(horarioServidor)
+      ? null
+      : iat - horarioServidor;
 
-  console.warn('DIAGNÓSTICO JWT', {
-    sub,
-    iat: iat ?? 'indisponível',
-    exp: exp ?? 'indisponível',
-    agoraCliente,
+  console.warn('JWT diagnóstico: token emitido no futuro', {
+    iat: iat === null ? 'indisponível' : new Date(iat * 1000).toISOString(),
+    exp: exp === null ? 'indisponível' : new Date(exp * 1000).toISOString(),
+    horarioLocal: new Date(agoraCliente * 1000).toISOString(),
     dataServidor: dataServidor ?? 'indisponível',
-    iatAdiantadoClienteSegundos:
-      iat === null ? 'indisponível' : iat - agoraCliente,
-    iatAdiantadoServidorSegundos:
-      iat === null || horarioServidor === null || Number.isNaN(horarioServidor)
-        ? 'indisponível'
-        : iat - horarioServidor,
-    validadeJwtSegundos:
-      iat === null || exp === null ? 'indisponível' : exp - iat,
+    iatAdiantadoClienteSegundos: iatAdiantadoClienteSegundos ?? 'indisponível',
+    iatAdiantadoServidorSegundos: iatAdiantadoServidorSegundos ?? 'indisponível',
   });
+
+  return { iatAdiantadoServidorSegundos, iatAdiantadoClienteSegundos };
 }

@@ -16,7 +16,6 @@ import { useEffect, useState } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
-  endpointRest,
   endpointAuth,
   carregarSessao,
   headersPublicos,
@@ -24,8 +23,11 @@ import {
   obterUsuarioDaSessao,
   removerSessao,
 } from '../../utils/sessao';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import type { Usuario } from '../../types';
-import { buscarResumo } from '../../utils/requisicoes';
+import { buscarMetas, buscarResumo, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
 
 type CategoriaFeedback = 'sugestao' | 'bug' | 'elogio';
 
@@ -54,6 +56,7 @@ export default function Perfil() {
   const [enviandoFeedback, setEnviandoFeedback] = useState(false);
   const [feedbackEnviado, setFeedbackEnviado] = useState(false);
   const [saindo, setSaindo] = useState(false);
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const router = useRouter();
 
   async function carregarPerfil() {
@@ -86,6 +89,54 @@ export default function Perfil() {
     }
   }
 
+  async function gerarPDF() {
+    if (!usuario || gerandoPdf) return;
+
+    setGerandoPdf(true);
+    try {
+      const headers = await headersAutenticados();
+      const [transacoes, metas, logoDataUrl] = await Promise.all([
+        buscarTransacoes(usuario.id, headers),
+        buscarMetas(usuario.id, headers),
+        obterLogoRelatorio(),
+      ]);
+      const html = criarHtmlRelatorioPdf({
+        email: usuario.email,
+        transacoes,
+        metas,
+        logoDataUrl,
+      });
+      const arquivo = await Print.printToFileAsync({ html });
+
+      try {
+        await criarNotificacao({
+          usuario_id: usuario.id,
+          titulo: 'Relatório gerado',
+          mensagem: 'Seu relatório financeiro foi gerado com sucesso.',
+          tipo: 'sistema',
+          lida: false,
+          chave_evento: `relatorio_gerado:${Date.now()}`,
+        }, headers);
+      } catch (error) {
+        console.error('Erro ao registrar notificação do relatório:', error);
+      }
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(arquivo.uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Compartilhar relatório EduFinance',
+        });
+      } else {
+        Alert.alert('Relatório gerado', `O arquivo foi salvo em ${arquivo.uri}`);
+      }
+    } catch (error) {
+      console.error('Erro ao gerar relatório:', error);
+      Alert.alert('Erro', 'Não foi possível gerar o relatório agora.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  }
+
   const enviarFeedback = async () => {
     if (enviandoFeedback) return;
     const texto = feedback.trim();
@@ -103,21 +154,12 @@ export default function Perfil() {
         return;
       }
 
-      const resposta = await fetch(endpointRest('feedback'), {
-        method: 'POST',
-        headers: await headersAutenticados(),
-        body: JSON.stringify({
-          usuario_id: usuario.id,
-          mensagem: texto,
-          categoria: categoriaFeedback,
-        }),
-      });
-
-      if (!resposta.ok) {
-        console.error('Erro ao enviar feedback:', await resposta.text());
-        Alert.alert('Ops', 'Não foi possível enviar. Tente novamente.');
-        return;
-      }
+      await enviarFeedbackAoBanco(
+        usuario.id,
+        texto,
+        categoriaFeedback,
+        await headersAutenticados()
+      );
 
       setFeedback('');
       setFeedbackEnviado(true);
@@ -131,14 +173,23 @@ export default function Perfil() {
     }
   };
 
-  const theme = {
-    container: { backgroundColor: '#F5F5F5' },
-    sectionBg: '#fff',
-    card: '#fff',
-    text: '#222',
-    subText: '#888',
-    border: '#F5F5F5',
-  };
+  const theme = temaEscuro
+    ? {
+        container: { backgroundColor: '#0F172A' },
+        sectionBg: '#1E293B',
+        card: '#1E293B',
+        text: '#F8FAFC',
+        subText: '#CBD5E1',
+        border: '#334155',
+      }
+    : {
+        container: { backgroundColor: '#F5F5F5' },
+        sectionBg: '#fff',
+        card: '#fff',
+        text: '#222',
+        subText: '#888',
+        border: '#F5F5F5',
+      };
 
   return (
     <ScrollView style={[styles.container, theme.container]}>
@@ -195,6 +246,23 @@ export default function Perfil() {
           />
         </View>
 
+        <TouchableOpacity
+          style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}
+          onPress={gerarPDF}
+          disabled={gerandoPdf || carregandoTransacoes || !usuario}
+        >
+          <View style={styles.itemEsquerda}>
+            <FileText size={20} color="#1A9E75" />
+            <View>
+              <Text style={[styles.itemTitulo, { color: theme.text }]}>Relatório em PDF</Text>
+              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>
+                {gerandoPdf ? 'Gerando relatório...' : 'Gerar e compartilhar seu resumo financeiro'}
+              </Text>
+            </View>
+          </View>
+          <ChevronRight size={18} color="#ccc" />
+        </TouchableOpacity>
+
         <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
@@ -230,13 +298,31 @@ export default function Perfil() {
 
         <Text style={[styles.itemTitulo, { marginHorizontal: 16, marginTop: 16, color: theme.text }]}>Canais de Contato</Text>
         <TouchableOpacity style={styles.contactButton}
-            onPress={() => Linking.openURL(`mailto:${process.env.EXPO_PUBLIC_SUPPORT_EMAIL}`)}
+            onPress={() => {
+              const email = process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
+              if (!email) {
+                Alert.alert('Contato indisponível', 'O e-mail de suporte não está configurado.');
+                return;
+              }
+              Linking.openURL(`mailto:${email}`).catch(() => {
+                Alert.alert('Erro', 'Não foi possível abrir o aplicativo de e-mail.');
+              });
+            }}
             >
         <Text style={styles.contactButtonText}>Fale Conosco</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.contactButton}
-          onPress={() => Linking.openURL(`https://wa.me{process.env.EXPO_PUBLIC_WHATSAPP_NUMBER}`)}
+          onPress={() => {
+            const numero = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, '');
+            if (!numero) {
+              Alert.alert('Contato indisponível', 'O número do WhatsApp não está configurado.');
+              return;
+            }
+            Linking.openURL(`https://wa.me/${numero}`).catch(() => {
+              Alert.alert('Erro', 'Não foi possível abrir o WhatsApp.');
+            });
+          }}
             >
         <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>

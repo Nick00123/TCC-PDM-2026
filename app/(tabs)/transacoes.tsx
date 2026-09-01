@@ -28,6 +28,11 @@ function dataValida(data: string) {
     && dataCriada.getDate() === dia;
 }
 
+function dataLocalHoje() {
+  const agora = new Date();
+  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+}
+
 export default function Transacoes() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
@@ -40,7 +45,7 @@ export default function Transacoes() {
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
-  const [data, setData] = useState(new Date().toISOString().split('T')[0]);
+  const [data, setData] = useState(dataLocalHoje());
   const [salvando, setSalvando] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
@@ -131,7 +136,7 @@ export default function Transacoes() {
     setValor('');
     setDescricao('');
     setCategoria('');
-    setData(new Date().toISOString().split('T')[0]);
+    setData(dataLocalHoje());
     setModalTipo(null);
   };
 

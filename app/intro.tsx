@@ -30,9 +30,14 @@ const RECURSOS = [
 export default function Intro() {
   const router = useRouter();
 
-  const irPara = async () => {
+  const irPara = async (aba: 'entrar' | 'criar') => {
     const sessao = await obterSessaoValida();
-    router.replace(sessao ? '/(tabs)' : '/login');
+    if (sessao) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    router.replace({ pathname: '/login', params: { aba } });
   };
 
   return (
@@ -71,11 +76,11 @@ export default function Intro() {
           Comece a transformar sua relação com o dinheiro hoje!
         </Text>
 
-        <TouchableOpacity style={styles.btnEntrar} onPress={irPara} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.btnEntrar} onPress={() => irPara('entrar')} activeOpacity={0.8}>
           <Text style={styles.btnEntrarTexto}>Entrar</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnCriar} onPress={irPara} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.btnCriar} onPress={() => irPara('criar')} activeOpacity={0.8}>
           <PiggyBank size={18} color="#1A9E75" />
           <Text style={styles.btnCriarTexto}>Criar minha conta</Text>
         </TouchableOpacity>
@@ -88,7 +93,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#7DC1A8' },
   content: { padding: 24, paddingBottom: 40 },
   top: { alignItems: 'center', marginTop: 40, marginBottom: 24 },
-  logo: { width: 200, height: 160, marginBottom: 16 },
+  logo: { width: 140, height: 110, marginBottom: 12 },
   titulo: {
     fontSize: 28,
     fontWeight: '800',

@@ -1,10 +1,10 @@
 import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, TrendingUp, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Meta, Transacao } from '../../types';
-import { buscarMetas, buscarTransacoes, pedirAnalise } from '../../utils/requisicoes';
-import { endpointRest, headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { buscarMetas, buscarTransacoes, pedirAnalise, requisicaoRest } from '../../utils/requisicoes';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 type Dica = {
   id: string;
@@ -16,7 +16,7 @@ type Dica = {
 };
 
 async function buscarDicas(): Promise<Dica[]> {
-  const resposta = await fetch(endpointRest('dicas?select=*&order=created_at.desc'), {
+  const resposta = await requisicaoRest('dicas?select=*&order=created_at.desc', {
     headers: await headersAutenticados(),
   });
 
@@ -120,8 +120,13 @@ export default function Dicas() {
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
   const telaEmFoco = useIsFocused();
+  const carregamentoEmAndamento = useRef(false);
+  const ultimoCarregamento = useRef(0);
 
-  const carregarTela = useCallback(async () => {
+  const carregarTela = useCallback(async (forcar = false) => {
+    if (carregamentoEmAndamento.current) return;
+    if (!forcar && Date.now() - ultimoCarregamento.current < 30_000) return;
+    carregamentoEmAndamento.current = true;
     setCarregandoDicas(true);
     setCarregandoAnalise(true);
     setErroDicas(null);
@@ -137,6 +142,8 @@ export default function Dicas() {
       setErroAnalise('A análise depende das dicas cadastradas e não pôde ser gerada agora.');
       setCarregandoDicas(false);
       setCarregandoAnalise(false);
+      carregamentoEmAndamento.current = false;
+      ultimoCarregamento.current = Date.now();
       return;
     }
     setCarregandoDicas(false);
@@ -172,6 +179,8 @@ export default function Dicas() {
       setErroAnalise('Não foi possível gerar sua análise agora. Toque em atualizar para tentar novamente.');
     } finally {
       setCarregandoAnalise(false);
+      carregamentoEmAndamento.current = false;
+      ultimoCarregamento.current = Date.now();
     }
   }, []);
 
@@ -206,7 +215,7 @@ export default function Dicas() {
         <View style={styles.destaqueCabecalho}>
           <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
           <TouchableOpacity
-            onPress={carregarTela}
+            onPress={() => carregarTela(true)}
             disabled={carregandoAnalise || carregandoDicas}
             accessibilityLabel="Atualizar análise financeira"
             accessibilityHint={`Reanalisa ${transacoes.length} transações e ${metas.length} metas ativas`}
