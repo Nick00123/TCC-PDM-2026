@@ -1,6 +1,6 @@
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ModalDeposito, ModalNovaMeta } from '../../components/MetasModais';
 import type { Meta } from '../../types';
@@ -12,7 +12,6 @@ export default function Metas() {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
   const [erroMetas, setErroMetas] = useState<string | null>(null);
-  const telaEmFoco = useIsFocused();
   const [metaSelecionada, setMetaSelecionada] = useState<string | null>(null);
   const [valorDeposito, setValorDeposito] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
@@ -38,9 +37,12 @@ export default function Metas() {
     }
   }
 
-  useEffect(() => {
-    if (telaEmFoco) carregarMetas();
-  }, [telaEmFoco]);
+  // Executa toda vez que a aba "Metas" entra em foco no Expo Router
+  useFocusEffect(
+    useCallback(() => {
+      carregarMetas();
+    }, [])
+  );
 
   async function adicionarMeta(nome: string, objetivo: number) {
     const usuario = await obterUsuarioDaSessao();
@@ -199,20 +201,19 @@ export default function Metas() {
     }
   };
 
-if (carregandoMetas) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <Text>Carregando metas...</Text>
-    </View>
-  );
-}
-
+  if (carregandoMetas) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
+      >
+        <Text>Carregando metas...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -241,9 +242,9 @@ if (carregandoMetas) {
           <Text style={styles.secaoTitulo}>EM ANDAMENTO</Text>
           {metasAndamento.map((meta: Meta) => {
             const pct =
-  meta.total > 0
-    ? Math.min(Math.round((meta.atual / meta.total) * 100), 100)
-    : 0;
+              meta.total > 0
+                ? Math.min(Math.round((meta.atual / meta.total) * 100), 100)
+                : 0;
             return (
               <View key={meta.id} style={styles.card}>
                 <View style={styles.cardHeader}>
@@ -262,7 +263,7 @@ if (carregandoMetas) {
 
                 <View style={styles.cardFooter}>
                   <View>
-<Text style={styles.valorAtual}>R$ {formatarMoeda(meta.atual)}</Text>
+                    <Text style={styles.valorAtual}>R$ {formatarMoeda(meta.atual)}</Text>
                     <Text style={styles.valorTotal}>de R$ {formatarMoeda(meta.total)}</Text>
                   </View>
                   <Text style={styles.pct}>{pct}%</Text>
@@ -286,7 +287,7 @@ if (carregandoMetas) {
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.metaTitulo}>{meta.titulo}</Text>
-<Text style={styles.concluidaTexto}>Concluída! R$ {formatarMoeda(meta.total)}</Text>
+                  <Text style={styles.concluidaTexto}>Concluída! R$ {formatarMoeda(meta.total)}</Text>
                 </View>
                 <Check size={22} color="#1A9E75" />
               </View>

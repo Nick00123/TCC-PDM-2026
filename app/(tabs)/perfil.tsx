@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Bug,
   ChevronRight,
@@ -12,8 +12,7 @@ import {
   Target,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import {
   endpointAuth,
@@ -25,6 +24,7 @@ import {
 } from '../../utils/sessao';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 import type { Usuario } from '../../types';
 import { buscarMetas, buscarResumo, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
 import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
@@ -49,7 +49,6 @@ export default function Perfil() {
   const [totalDespesas, setTotalDespesas] = useState(0);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const telaEmFoco = useIsFocused();
   const [temaEscuro, setTemaEscuro] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [categoriaFeedback, setCategoriaFeedback] = useState<CategoriaFeedback>('sugestao');
@@ -59,31 +58,54 @@ export default function Perfil() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const router = useRouter();
 
-  async function carregarPerfil() {
+  const carregarPerfil = useCallback(async () => {
     setCarregandoTransacoes(true);
     try {
       const dadosUsuario = await obterUsuarioDaSessao();
-      if (!dadosUsuario) { router.replace('/login'); return; }
-      setUsuario({ id: dadosUsuario.id, nome: dadosUsuario.user_metadata?.nome || dadosUsuario.email?.split('@')[0] || '', email: dadosUsuario.email || '' });
+      if (!dadosUsuario) {
+        router.replace('/login');
+        return;
+      }
+      setUsuario({
+        id: dadosUsuario.id,
+        nome: dadosUsuario.user_metadata?.nome || dadosUsuario.email?.split('@')[0] || '',
+        email: dadosUsuario.email || '',
+      });
       const lista = await buscarResumo(dadosUsuario.id, await headersAutenticados());
-      setTotalReceitas(lista.filter((item: any) => item.tipo === 'receita').reduce((total: number, item: any) => total + Number(item.valor), 0));
-      setTotalDespesas(lista.filter((item: any) => item.tipo === 'despesa').reduce((total: number, item: any) => total + Number(item.valor), 0));
+      setTotalReceitas(
+        lista
+          .filter((item: any) => item.tipo === 'receita')
+          .reduce((total: number, item: any) => total + Number(item.valor), 0)
+      );
+      setTotalDespesas(
+        lista
+          .filter((item: any) => item.tipo === 'despesa')
+          .reduce((total: number, item: any) => total + Number(item.valor), 0)
+      );
       setErroTransacoes(null);
-    } catch (error) { console.error(error); setErroTransacoes('Resumo indisponível'); }
-    finally { setCarregandoTransacoes(false); }
-  }
+    } catch (error) {
+      console.error(error);
+      setErroTransacoes('Resumo indisponível');
+    } finally {
+      setCarregandoTransacoes(false);
+    }
+  }, [router]);
 
-  useEffect(() => {
-    if (telaEmFoco) carregarPerfil();
-    // Recarrega somente quando a aba recebe ou perde o foco.
-    // sem essa linha o aplicativo pode entrar em um loop infinito de travamento, rodando a função bilhões de vezes por segundo. já que o carregarPerfil não está colchetes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telaEmFoco]);
+  useFocusEffect(
+    useCallback(() => {
+      void carregarPerfil();
+    }, [carregarPerfil])
+  );
 
   async function logout() {
     const sessao = await carregarSessao();
     try {
-      if (sessao?.accessToken) await fetch(endpointAuth('logout'), { method: 'POST', headers: { ...headersPublicos(), Authorization: `Bearer ${sessao.accessToken}` } });
+      if (sessao?.accessToken) {
+        await fetch(endpointAuth('logout'), {
+          method: 'POST',
+          headers: { ...headersPublicos(), Authorization: `Bearer ${sessao.accessToken}` },
+        });
+      }
     } finally {
       await removerSessao();
     }
@@ -106,28 +128,43 @@ export default function Perfil() {
         metas,
         logoDataUrl,
       });
-      const arquivo = await Print.printToFileAsync({ html });
+      const arquivo = await Print.printToFileAsync({ html, base64: true });
+      if (!arquivo.base64) {
+        throw new Error('O PDF foi gerado sem conteúdo para compartilhamento.');
+      }
+
+      // A URI temporária do expo-print pode não ser legível pelo expo-sharing
+      // no Expo Go/Android. Este arquivo fica no cache autorizado do aplicativo.
+      const pdfCompartilhavel = new File(
+        Paths.cache,
+        `relatorio-edufinance-${Date.now()}.pdf`
+      );
+      pdfCompartilhavel.create({ overwrite: true });
+      pdfCompartilhavel.write(arquivo.base64, { encoding: 'base64' });
 
       try {
-        await criarNotificacao({
-          usuario_id: usuario.id,
-          titulo: 'Relatório gerado',
-          mensagem: 'Seu relatório financeiro foi gerado com sucesso.',
-          tipo: 'sistema',
-          lida: false,
-          chave_evento: `relatorio_gerado:${Date.now()}`,
-        }, headers);
+        await criarNotificacao(
+          {
+            usuario_id: usuario.id,
+            titulo: 'Relatório gerado',
+            mensagem: 'Seu relatório financeiro foi gerado com sucesso.',
+            tipo: 'sistema',
+            lida: false,
+            chave_evento: `relatorio_gerado:${Date.now()}`,
+          },
+          headers
+        );
       } catch (error) {
         console.error('Erro ao registrar notificação do relatório:', error);
       }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(arquivo.uri, {
+        await Sharing.shareAsync(pdfCompartilhavel.uri, {
           mimeType: 'application/pdf',
           dialogTitle: 'Compartilhar relatório EduFinance',
         });
       } else {
-        Alert.alert('Relatório gerado', `O arquivo foi salvo em ${arquivo.uri}`);
+        Alert.alert('Relatório gerado', `O arquivo foi salvo em ${pdfCompartilhavel.uri}`);
       }
     } catch (error) {
       console.error('Erro ao gerar relatório:', error);
@@ -147,15 +184,15 @@ export default function Perfil() {
     setEnviandoFeedback(true);
 
     try {
-      const usuario = await obterUsuarioDaSessao();
+      const usuarioSessao = await obterUsuarioDaSessao();
 
-      if (!usuario) {
+      if (!usuarioSessao) {
         Alert.alert('Ops', 'Você precisa estar logado para enviar feedback.');
         return;
       }
 
       await enviarFeedbackAoBanco(
-        usuario.id,
+        usuarioSessao.id,
         texto,
         categoriaFeedback,
         await headersAutenticados()
@@ -193,7 +230,6 @@ export default function Perfil() {
 
   return (
     <ScrollView style={[styles.container, theme.container]}>
-
       {/* Card do usuário */}
       <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' }]}>
         <View style={styles.avatar}>
@@ -286,7 +322,7 @@ export default function Perfil() {
       </View>
 
       {/* Ajuda e suporte */}
-      <Text style={styles.secaoTitulo}>AJUDA E SUPORTE</Text>
+      <Text style={[styles.secaoTitulo, { color: theme.subText }]}>AJUDA E SUPORTE</Text>
       <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}>
         <View style={[styles.faqCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <Text style={[styles.itemTitulo, { color: theme.text }]}>Perguntas Frequentes (FAQ)</Text>
@@ -297,22 +333,24 @@ export default function Perfil() {
         </View>
 
         <Text style={[styles.itemTitulo, { marginHorizontal: 16, marginTop: 16, color: theme.text }]}>Canais de Contato</Text>
-        <TouchableOpacity style={styles.contactButton}
-            onPress={() => {
-              const email = process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
-              if (!email) {
-                Alert.alert('Contato indisponível', 'O e-mail de suporte não está configurado.');
-                return;
-              }
-              Linking.openURL(`mailto:${email}`).catch(() => {
-                Alert.alert('Erro', 'Não foi possível abrir o aplicativo de e-mail.');
-              });
-            }}
-            >
-        <Text style={styles.contactButtonText}>Fale Conosco</Text>
+        <TouchableOpacity
+          style={styles.contactButton}
+          onPress={() => {
+            const email = process.env.EXPO_PUBLIC_SUPPORT_EMAIL;
+            if (!email) {
+              Alert.alert('Contato indisponível', 'O e-mail de suporte não está configurado.');
+              return;
+            }
+            Linking.openURL(`mailto:${email}`).catch(() => {
+              Alert.alert('Erro', 'Não foi possível abrir o aplicativo de e-mail.');
+            });
+          }}
+        >
+          <Text style={styles.contactButtonText}>Fale Conosco</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.contactButton}
+        <TouchableOpacity
+          style={styles.contactButton}
           onPress={() => {
             const numero = process.env.EXPO_PUBLIC_WHATSAPP_NUMBER?.replace(/\D/g, '');
             if (!numero) {
@@ -323,18 +361,16 @@ export default function Perfil() {
               Alert.alert('Erro', 'Não foi possível abrir o WhatsApp.');
             });
           }}
-            >
-        <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
+        >
+          <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
 
-
-<View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <Text style={[styles.itemTitulo, { color: theme.text }]}>Feedback / Enviar Sugestão</Text>
           <Text style={[styles.feedbackSubtitulo, { color: theme.subText }]}>
             Sua mensagem vai direto para os desenvolvedores do app.
           </Text>
 
-          {/* Seleção de categoria */}
           <View style={styles.categoriaRow}>
             {CATEGORIAS_FEEDBACK.map((cat) => {
               const ativa = categoriaFeedback === cat.chave;
@@ -415,7 +451,6 @@ export default function Perfil() {
         <LogOut size={18} color="#F44336" />
         <Text style={styles.btnSairTexto}>{saindo ? 'Saindo...' : 'Sair da Conta'}</Text>
       </TouchableOpacity>
-
     </ScrollView>
   );
 }
@@ -489,7 +524,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   contactButtonText: { color: '#fff', fontWeight: '700' },
-feedbackBox: {
+  feedbackBox: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
     marginTop: 16,

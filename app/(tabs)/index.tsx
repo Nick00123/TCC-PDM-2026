@@ -1,8 +1,7 @@
 import EvolucaoMensal from '@/components/EvolucaoMensal';
 import GastosPorCategoria from '@/components/GastosPorCategoria';
-import { router } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { ChevronRight } from 'lucide-react-native';
 import AcoesRapidas from '../../components/AcoesRapidas';
 import BalanceCard from '../../components/BalanceCard';
@@ -27,9 +26,7 @@ export default function Home() {
   const [carregandoNotificacoes, setCarregandoNotificacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
   const [erroNotificacoes, setErroNotificacoes] = useState<string | null>(null);
-  const telaEmFoco = useIsFocused();
-
-  async function carregarDados() {
+  const carregarDados = useCallback(async () => {
     setCarregandoTransacoes(true);
     setCarregandoNotificacoes(true);
     try {
@@ -71,9 +68,13 @@ export default function Home() {
       setCarregandoTransacoes(false);
       setCarregandoNotificacoes(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { if (telaEmFoco) carregarDados(); }, [telaEmFoco]);
+  useFocusEffect(
+    useCallback(() => {
+      void carregarDados();
+    }, [carregarDados])
+  );
 
   async function alterarNotificacao(caminho: string, metodo: 'PATCH' | 'DELETE') {
     const usuario = await obterUsuarioDaSessao();

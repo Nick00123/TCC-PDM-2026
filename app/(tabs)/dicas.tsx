@@ -1,6 +1,6 @@
 import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, TrendingUp, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Meta, Transacao } from '../../types';
 import { buscarMetas, buscarTransacoes, pedirAnalise, requisicaoRest } from '../../utils/requisicoes';
@@ -119,7 +119,7 @@ export default function Dicas() {
   const [busca, setBusca] = useState('');
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
-  const telaEmFoco = useIsFocused();
+
   const carregamentoEmAndamento = useRef(false);
   const ultimoCarregamento = useRef(0);
 
@@ -184,9 +184,12 @@ export default function Dicas() {
     }
   }, []);
 
-  useEffect(() => {
-    if (telaEmFoco) carregarTela();
-  }, [telaEmFoco, carregarTela]);
+  // Recarrega os dados toda vez que a tela entra em foco no Expo Router
+  useFocusEffect(
+    useCallback(() => {
+      carregarTela();
+    }, [carregarTela])
+  );
 
   const dicasFiltradas = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase('pt-BR');
@@ -432,56 +435,56 @@ const styles = StyleSheet.create({
   carregandoLista: { marginVertical: 24 },
   erroLista: { color: '#B91C1C', textAlign: 'center', marginHorizontal: 24, marginVertical: 20 },
   secaoTitulo: {
-  fontSize: 16,
-  fontWeight: 'bold',
-  marginHorizontal: 16,
-  marginBottom: 4,
-  marginTop: 8,
-},
-secaoSubtitulo: {
-  fontSize: 12,
-  color: '#888',
-  marginHorizontal: 16,
-  marginBottom: 12,
-},
-videosScroll: { paddingLeft: 16, marginBottom: 24 },
-videoCard: {
-  backgroundColor: '#fff',
-  borderRadius: 16,
-  marginRight: 12,
-  width: 200,
-  overflow: 'hidden',
-  elevation: 2,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 1 },
-  shadowOpacity: 0.08,
-  shadowRadius: 4,
-},
-thumbnail: {
-  backgroundColor: '#1A9E75',
-  height: 110,
-  width: '100%',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-thumbnailImage: {
-  width: '100%',
-  height: '100%',
-},
-playOverlay: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  justifyContent: 'center',
-  alignItems: 'center',
-  backgroundColor: 'rgba(0,0,0,0.2)',
-},
-videoInfo: { padding: 12 },
-videoTitulo: { fontSize: 13, fontWeight: 'bold', marginVertical: 4 },
-videoCanal: { fontSize: 12, color: '#888' },
-videoDuracao: { fontSize: 11, color: '#aaa', marginTop: 4 },
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginHorizontal: 16,
+    marginBottom: 4,
+    marginTop: 8,
+  },
+  secaoSubtitulo: {
+    fontSize: 12,
+    color: '#888',
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  videosScroll: { paddingLeft: 16, marginBottom: 24 },
+  videoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginRight: 12,
+    width: 200,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  thumbnail: {
+    backgroundColor: '#1A9E75',
+    height: 110,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  playOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  videoInfo: { padding: 12 },
+  videoTitulo: { fontSize: 13, fontWeight: 'bold', marginVertical: 4 },
+  videoCanal: { fontSize: 12, color: '#888' },
+  videoDuracao: { fontSize: 11, color: '#aaa', marginTop: 4 },
   dicaCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -504,7 +507,7 @@ videoDuracao: { fontSize: 11, color: '#aaa', marginTop: 4 },
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-dicaTitulo: { fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
+  dicaTitulo: { fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -512,8 +515,8 @@ dicaTitulo: { fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
     flexShrink: 0,
   },
   badgeTexto: { fontSize: 11, fontWeight: '600' },
-dicaDescricao: { fontSize: 13, color: '#666', lineHeight: 18, marginBottom: 4 },
-verDetalhe: { fontSize: 12, color: '#1A9E75', fontWeight: '600', marginTop: 2 },
+  dicaDescricao: { fontSize: 13, color: '#666', lineHeight: 18, marginBottom: 4 },
+  verDetalhe: { fontSize: 12, color: '#1A9E75', fontWeight: '600', marginTop: 2 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

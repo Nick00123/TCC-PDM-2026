@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -66,9 +66,8 @@ export default function Relatorios() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const telaEmFoco = useIsFocused();
 
-  async function carregarTransacoes() {
+  const carregarTransacoes = useCallback(async () => {
     setCarregandoTransacoes(true);
     try {
       const usuario = await obterUsuarioDaSessao();
@@ -78,9 +77,13 @@ export default function Relatorios() {
       setErroTransacoes(null);
     } catch (error) { console.error(error); setErroTransacoes('Não foi possível carregar as transações.'); }
     finally { setCarregandoTransacoes(false); }
-  }
+  }, []);
 
-  useEffect(() => { if (telaEmFoco) carregarTransacoes(); }, [telaEmFoco]);
+  useFocusEffect(
+    useCallback(() => {
+      void carregarTransacoes();
+    }, [carregarTransacoes])
+  );
   const [aba, setAba] = useState<Aba>('geral');
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const [mesSelecionado, setMesSelecionado] = useState<number>(new Date().getMonth());

@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2 } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
-import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import FormularioTransacao from '../../components/FormularioTransacao';
 import type { Transacao } from '../../types';
@@ -37,7 +37,6 @@ export default function Transacoes() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const telaEmFoco = useIsFocused();
   const [filtro, setFiltro] = useState<Filtro>('todos');
   const [busca, setBusca] = useState('');
   const [modalTipo, setModalTipo] = useState<TipoModal>(null);
@@ -49,7 +48,7 @@ export default function Transacoes() {
   const [salvando, setSalvando] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
-  async function carregarTransacoes() {
+  const carregarTransacoes = useCallback(async () => {
     setCarregandoTransacoes(true);
     try {
       const usuario = await obterUsuarioDaSessao();
@@ -63,11 +62,13 @@ export default function Transacoes() {
     } finally {
       setCarregandoTransacoes(false);
     }
-  }
+  }, []);
 
-  useEffect(() => {
-    if (telaEmFoco) carregarTransacoes();
-  }, [telaEmFoco]);
+  useFocusEffect(
+    useCallback(() => {
+      void carregarTransacoes();
+    }, [carregarTransacoes])
+  );
 
   async function adicionarTransacao(nova: Omit<Transacao, 'id'>) {
     const usuario = await obterUsuarioDaSessao();
