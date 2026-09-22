@@ -10,6 +10,7 @@ type Props = {
 };
 
 export default function SeletorMesModal({ visivel, meses, mesSelecionado, selecionar, fechar }: Props) {
+  // A tela de relatório manda a lista de meses e recebe o índice escolhido.
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={fechar}>
       <View style={styles.overlay}><View style={styles.container}>
@@ -18,6 +19,7 @@ export default function SeletorMesModal({ visivel, meses, mesSelecionado, seleci
           <TouchableOpacity onPress={fechar}><X size={20} color="#8E8E93" /></TouchableOpacity>
         </View>
         <View style={styles.grid}>
+          {/* Os meses ficam em uma grade para ocupar menos espaço. */}
           {meses.map((mes, indice) => (
             <TouchableOpacity key={mes} style={[styles.item, indice === mesSelecionado && styles.itemAtivo]} onPress={() => selecionar(indice)}>
               <Text style={[styles.texto, indice === mesSelecionado && styles.textoAtivo]}>{mes}</Text>

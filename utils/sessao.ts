@@ -11,6 +11,7 @@ export const SUPABASE_URL: string = urlConfigurada;
 export const SUPABASE_ANON_KEY: string = chaveConfigurada;
 
 const CHAVE_SESSAO = '@edufinance:sessao-http';
+// Renovo um pouco antes de vencer para evitar erro no meio de uma requisição.
 const MARGEM_EXPIRACAO_MS = 60 * 1000;
 
 export type Sessao = {
@@ -37,6 +38,7 @@ type RespostaRefresh = {
 let refreshEmAndamento: Promise<Sessao | null> | null = null;
 
 export function headersPublicos(): Record<string, string> {
+  // Esses headers são suficientes para chamadas públicas do Supabase.
   return {
     apikey: SUPABASE_ANON_KEY,
     'Content-Type': 'application/json',
@@ -52,6 +54,7 @@ export function endpointRest(caminho: string): string {
 }
 
 export function criarSessao(dados: RespostaRefresh): Sessao | null {
+  // Se faltar algum dado importante, considero que a sessão veio inválida.
   if (
     !dados.access_token ||
     !dados.refresh_token ||
@@ -72,6 +75,7 @@ export function criarSessao(dados: RespostaRefresh): Sessao | null {
 }
 
 export async function salvarSessao(sessao: Sessao): Promise<void> {
+  // A sessão fica salva para a pessoa não precisar entrar toda hora.
   await AsyncStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
 }
 
@@ -93,6 +97,7 @@ export async function removerSessao(): Promise<void> {
 }
 
 async function renovarSessao(sessao: Sessao): Promise<Sessao | null> {
+  // Uso o refresh token para conseguir um access token novo.
   const resposta = await fetch(
     `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
     {
@@ -144,6 +149,7 @@ export async function obterSessaoValida(): Promise<Sessao | null> {
     return sessao;
   }
 
+  // Só uma renovação roda por vez, mesmo se várias telas pedirem a sessão.
   if (!refreshEmAndamento) {
     refreshEmAndamento = renovarSessao(sessao).finally(() => {
       refreshEmAndamento = null;
@@ -159,6 +165,7 @@ export async function obterUsuarioDaSessao(): Promise<Sessao['user'] | null> {
 }
 
 export async function headersAutenticados(): Promise<Record<string, string>> {
+  // Esse header identifica a conta que está fazendo a requisição.
   const sessao = await obterSessaoValida();
 
   if (!sessao) {
@@ -179,6 +186,7 @@ export function diagnosticarErroJwt(
   iatAdiantadoServidorSegundos: number | null;
   iatAdiantadoClienteSegundos: number | null;
 } | null {
+  // Tento descobrir se o horário do token ficou adiantado em relação ao servidor.
   const erroNormalizado = corpoErro.toLowerCase();
 
   if (

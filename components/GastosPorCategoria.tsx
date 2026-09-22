@@ -1,4 +1,3 @@
-import React from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryPie } from 'victory-native';
 import type { Transacao } from '../types';
@@ -10,11 +9,13 @@ type Props = {
 };
 
 export default function GastosPorCategoria({ transacoes }: Props) {
+  // O tamanho muda junto com a largura do celular.
   const { width } = useWindowDimensions();
 
   // Tamanho do donut dimensionado conforme a tela (metade da largura disponível)
   const tamanhoPie = Math.min(width / 2.4, 170);
 
+  // Primeiro junto todas as despesas com o mesmo nome de categoria.
   const categorias: { [key: string]: number } = {};
   transacoes
     .filter((t: Transacao) => t.tipo === 'despesa')
@@ -22,6 +23,7 @@ export default function GastosPorCategoria({ transacoes }: Props) {
       categorias[t.categoria] = (categorias[t.categoria] || 0) + t.valor;
     });
 
+  // Esse total serve para calcular a porcentagem de cada fatia.
   const total = Object.values(categorias).reduce((a, b) => a + b, 0);
 
   const dados = Object.entries(categorias).map(([nome, valor]) => ({
@@ -38,6 +40,7 @@ export default function GastosPorCategoria({ transacoes }: Props) {
     };
   });
 
+  // Sem despesas, não tem gráfico para mostrar.
   if (dados.length === 0) return null;
 
   return (

@@ -1,21 +1,13 @@
+import { useFocusEffect } from 'expo-router';
 import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, TrendingUp, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { Meta, Transacao } from '../../types';
+import type { Dica, Meta, Transacao, Video } from '../../types';
 import { buscarMetas, buscarTransacoes, pedirAnalise, requisicaoRest } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
-type Dica = {
-  id: string;
-  titulo: string;
-  descricao: string;
-  categoria: string;
-  conteudo: string;
-  created_at: string;
-};
-
 async function buscarDicas(): Promise<Dica[]> {
+  // As dicas ficam salvas no banco para poderem ser atualizadas sem mudar o app.
   const resposta = await requisicaoRest('dicas?select=*&order=created_at.desc', {
     headers: await headersAutenticados(),
   });
@@ -29,6 +21,7 @@ async function buscarDicas(): Promise<Dica[]> {
 }
 
 function iconeDaDica(categoria: string, tamanho = 28) {
+  // Cada categoria tem um ícone para ficar mais fácil reconhecer o assunto.
   const props = { size: tamanho, color: categoria === 'Comportamento' ? '#6A1B9A' : '#1A9E75' };
   const icones: Record<string, React.ReactNode> = {
     Educação: <Ruler {...props} />,
@@ -41,17 +34,8 @@ function iconeDaDica(categoria: string, tamanho = 28) {
   return icones[categoria] ?? <DollarSign {...props} />;
 }
 
-type Video = {
-  id: string;
-  titulo: string;
-  canal: string;
-  duracao: string;
-  categoria: string;
-  url: string;
-  thumbnail?: string;
-};
-
 const getYoutubeThumbnail = (url: string) => {
+  // O próprio YouTube fornece uma imagem usando o id do vídeo.
   const match = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
   return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : undefined;
 };
@@ -124,6 +108,7 @@ export default function Dicas() {
   const ultimoCarregamento = useRef(0);
 
   const carregarTela = useCallback(async (forcar = false) => {
+    // Evito várias chamadas seguidas quando a pessoa entra e sai da tela.
     if (carregamentoEmAndamento.current) return;
     if (!forcar && Date.now() - ultimoCarregamento.current < 30_000) return;
     carregamentoEmAndamento.current = true;
@@ -160,6 +145,7 @@ export default function Dicas() {
       setTransacoes(listaTransacoes);
       setMetas(metasAtivas);
 
+      // Monto um resumo simples para a análise financeira personalizada.
       const receitas = listaTransacoes
         .filter((item) => item.tipo === 'receita')
         .reduce((total, item) => total + item.valor, 0);
@@ -191,6 +177,7 @@ export default function Dicas() {
     }, [carregarTela])
   );
 
+  // A busca olha no título, descrição e categoria da dica.
   const dicasFiltradas = useMemo(() => {
     const termo = busca.trim().toLocaleLowerCase('pt-BR');
     if (!termo) return dicas;
@@ -213,6 +200,7 @@ export default function Dicas() {
         <Text style={styles.subtitulo}>Baseadas no seu perfil financeiro</Text>
       </View>
 
+      {/* Essa análise usa as transações e metas atuais do usuário. */}
       {/* Dica personalizada */}
       <View style={styles.dicaDestaque}>
         <View style={styles.destaqueCabecalho}>

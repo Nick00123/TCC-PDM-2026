@@ -1,20 +1,18 @@
-import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2 } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import FormularioTransacao from '../../components/FormularioTransacao';
-import type { Transacao } from '../../types';
+import type { FiltroTransacao, TipoModalTransacao, Transacao } from '../../types';
 import { corDaCategoria, formatarData, normalizarData } from '../../utils/formatacao';
 import { buscarTransacoes, criarTransacao, excluirTransacao } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
-
-type Filtro = 'todos' | 'receitas' | 'despesas';
-type TipoModal = 'receita' | 'despesa' | null;
 
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
 
 function dataValida(data: string) {
+  // Essa validação evita datas impossíveis, como 31 de fevereiro.
   const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
   if (!partes) return false;
 
@@ -37,9 +35,9 @@ export default function Transacoes() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<Filtro>('todos');
+  const [filtro, setFiltro] = useState<FiltroTransacao>('todos');
   const [busca, setBusca] = useState('');
-  const [modalTipo, setModalTipo] = useState<TipoModal>(null);
+  const [modalTipo, setModalTipo] = useState<TipoModalTransacao>(null);
 
   const [valor, setValor] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -49,6 +47,7 @@ export default function Transacoes() {
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   const carregarTransacoes = useCallback(async () => {
+    // A lista é recarregada quando a aba volta a ficar visível.
     setCarregandoTransacoes(true);
     try {
       const usuario = await obterUsuarioDaSessao();
@@ -86,6 +85,7 @@ export default function Transacoes() {
     return { sucesso: true, mensagem: '' };
   }
 
+  // Primeiro aplico o filtro escolhido e depois a busca pelo texto.
   const transacoesFiltradas = transacoes
     .filter((t: Transacao) => {
       if (filtro === 'receitas') return t.tipo === 'receita';
@@ -96,6 +96,7 @@ export default function Transacoes() {
       t.descricao.toLowerCase().includes(busca.toLowerCase())
     );
 
+  // Esse saldo muda conforme o filtro e a busca atuais.
   const saldoFiltrado = transacoesFiltradas.reduce((acc: number, t: { tipo: string; valor: number; }) => {
     return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
   }, 0);
@@ -142,6 +143,7 @@ export default function Transacoes() {
   };
 
   const salvar = async () => {
+    // Converto o valor brasileiro para número antes de salvar.
     if (salvando || !modalTipo) return;
 
     if (!descricao.trim() || !categoria) {
@@ -213,6 +215,7 @@ export default function Transacoes() {
     );
   };
 
+  // A lista de categorias muda conforme o tipo escolhido.
   const categorias = modalTipo === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
 
   return (
@@ -258,7 +261,7 @@ export default function Transacoes() {
       {/* Filtros */}
       <View style={styles.filtrosRow}>
         <View style={styles.filtros}>
-          {(['todos', 'receitas', 'despesas'] as Filtro[]).map(f => (
+          {(['todos', 'receitas', 'despesas'] as FiltroTransacao[]).map(f => (
             <TouchableOpacity
               key={f}
               style={[styles.filtroBotao, filtro === f && styles.filtroAtivo]}

@@ -1,41 +1,32 @@
+import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import {
-  Bug,
-  ChevronRight,
-  FileText,
-  HelpCircle,
-  Lightbulb,
-  LogOut,
-  Send,
-  Shield,
-  Star,
-  Target,
-  type LucideIcon,
+    Bug,
+    ChevronRight,
+    FileText,
+    HelpCircle,
+    Lightbulb,
+    LogOut,
+    Send,
+    Shield,
+    Star,
+    Target,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import {
-  endpointAuth,
-  carregarSessao,
-  headersPublicos,
-  headersAutenticados,
-  obterUsuarioDaSessao,
-  removerSessao,
-} from '../../utils/sessao';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import { File, Paths } from 'expo-file-system';
-import type { Usuario } from '../../types';
-import { buscarMetas, buscarResumo, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import type { CategoriaFeedback, OpcaoFeedback, Usuario } from '../../types';
 import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
-
-type CategoriaFeedback = 'sugestao' | 'bug' | 'elogio';
-
-type OpcaoFeedback = {
-  chave: CategoriaFeedback;
-  icone: LucideIcon;
-  label: string;
-};
+import { buscarMetas, buscarResumo, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import {
+    carregarSessao,
+    endpointAuth,
+    headersAutenticados,
+    headersPublicos,
+    obterUsuarioDaSessao,
+    removerSessao,
+} from '../../utils/sessao';
 
 const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
   { chave: 'sugestao', icone: Lightbulb, label: 'Sugestão' },
@@ -59,6 +50,7 @@ export default function Perfil() {
   const router = useRouter();
 
   const carregarPerfil = useCallback(async () => {
+    // Busco os dados do usuário e o resumo financeiro para esta tela.
     setCarregandoTransacoes(true);
     try {
       const dadosUsuario = await obterUsuarioDaSessao();
@@ -98,6 +90,7 @@ export default function Perfil() {
   );
 
   async function logout() {
+    // Primeiro aviso o servidor e depois apago a sessão salva no celular.
     const sessao = await carregarSessao();
     try {
       if (sessao?.accessToken) {
@@ -116,6 +109,7 @@ export default function Perfil() {
 
     setGerandoPdf(true);
     try {
+      // O PDF usa os mesmos dados que aparecem nas outras telas do app.
       const headers = await headersAutenticados();
       const [transacoes, metas, logoDataUrl] = await Promise.all([
         buscarTransacoes(usuario.id, headers),
@@ -175,6 +169,7 @@ export default function Perfil() {
   }
 
   const enviarFeedback = async () => {
+    // Não envio mensagem vazia nem deixo clicar duas vezes durante o envio.
     if (enviandoFeedback) return;
     const texto = feedback.trim();
     if (!texto) {
@@ -210,6 +205,7 @@ export default function Perfil() {
     }
   };
 
+  // Escolho as cores da tela conforme o tema marcado.
   const theme = temaEscuro
     ? {
         container: { backgroundColor: '#0F172A' },

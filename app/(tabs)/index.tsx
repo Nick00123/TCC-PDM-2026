@@ -1,20 +1,20 @@
 import EvolucaoMensal from '@/components/EvolucaoMensal';
 import GastosPorCategoria from '@/components/GastosPorCategoria';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
 import { ChevronRight } from 'lucide-react-native';
+import { useCallback, useState } from 'react';
 import AcoesRapidas from '../../components/AcoesRapidas';
 import BalanceCard from '../../components/BalanceCard';
 import Cabecalho from '../../components/Cabecalho';
 import MetaCard from '../../components/MetaCard';
 import TransacaoItem from '../../components/TransacaoItem';
 import type { Meta, Notificacao, Transacao } from '../../types';
-import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 import { alterarNotificacoes, buscarMetas, buscarNotificacoes, buscarTransacoes, criarNotificacao } from '../../utils/requisicoes';
+import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Limite de itens exibidos na tela inicial para evitar poluição visual
+// Mostro poucos itens na home para ela não ficar cheia demais.
 const LIMITE_METAS = 5;
 const LIMITE_TRANSACOES = 5;
 
@@ -27,6 +27,7 @@ export default function Home() {
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
   const [erroNotificacoes, setErroNotificacoes] = useState<string | null>(null);
   const carregarDados = useCallback(async () => {
+    // A home busca tudo que precisa para montar o resumo de uma vez.
     setCarregandoTransacoes(true);
     setCarregandoNotificacoes(true);
     try {
@@ -42,6 +43,7 @@ export default function Home() {
       setErroTransacoes(null);
 
       try {
+        // Essas notificações são criadas só quando acontece uma situação importante.
         const notificacoesPendentes = listaMetas
           .filter((meta) => meta.atual >= meta.total)
           .map((meta) => criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${meta.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${meta.id}` }, headers));
@@ -95,6 +97,7 @@ export default function Home() {
 
   const totalReceitas = transacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
   const totalDespesas = transacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+  // O saldo é tudo que entrou menos tudo que saiu.
   const saldoTotal = totalReceitas - totalDespesas;
 
   const metasEmAndamento = metas.filter((meta: Meta) => meta.atual < meta.total);
@@ -113,6 +116,7 @@ export default function Home() {
       )}
       <AcoesRapidas />
 
+      {/* Mostro só as metas abertas e deixo um botão para ver o restante. */}
       {metasEmAndamento.length > 0 && (
         <>
           {metasVisiveis.map((meta: Meta) => (

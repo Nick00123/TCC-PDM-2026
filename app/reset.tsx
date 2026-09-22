@@ -4,6 +4,7 @@ import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 're
 import { endpointAuth, headersPublicos } from '../utils/sessao';
 
 function primeiroParametro(valor: string | string[] | undefined) {
+  // O Expo pode entregar um parâmetro sozinho ou dentro de uma lista.
   return Array.isArray(valor) ? valor[0] : valor;
 }
 
@@ -18,6 +19,7 @@ export default function RedefinirSenha() {
   );
 
   useEffect(() => {
+    // O token pode chegar pela URL que abriu o app ou por um link recebido depois.
     const extrairToken = (url: string | null) => {
       if (!url) return;
       const resultado = /(?:[?#&])access_token=([^&]+)/.exec(url);
@@ -30,6 +32,7 @@ export default function RedefinirSenha() {
   }, []);
 
   const redefinir = async () => {
+    // Evito dois cliques tentando salvar a senha ao mesmo tempo.
     if (salvando) return;
     if (senha.length < 6) {
       Alert.alert('Senha inválida', 'A senha deve ter pelo menos 6 caracteres.');
@@ -40,6 +43,7 @@ export default function RedefinirSenha() {
       return;
     }
 
+    // Esse token prova que a troca de senha veio do e-mail correto.
     const accessToken = tokenDoLink;
     if (!accessToken) {
       Alert.alert('Link inválido', 'Solicite um novo link de redefinição de senha.');

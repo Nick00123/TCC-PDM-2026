@@ -1,28 +1,29 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Alert,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
-import {
-  criarSessao,
-  headersAutenticados,
-  salvarSessao,
-} from '../utils/sessao';
 import Botao from '../components/Botao';
 import { enviarAutenticacao, salvarPerfil } from '../utils/requisicoes';
+import {
+    criarSessao,
+    headersAutenticados,
+    salvarSessao,
+} from '../utils/sessao';
 
 function mensagemDeErro(erro: any): string {
+  // Transformo os erros técnicos da API em mensagens mais fáceis de entender.
   const mensagem = erro?.msg || erro?.error_description || erro?.message || erro?.error || '';
   const texto = `${erro?.code || ''} ${mensagem}`.toLowerCase();
 
@@ -51,6 +52,7 @@ export default function App() {
   const router = useRouter();
 
   const confirmar = async () => {
+    // O mesmo botão faz login ou cadastro, dependendo da aba selecionada.
     if (!gmail || !senha) {
       Alert.alert("Erro", "Preencha os campos!");
       return;
@@ -81,6 +83,7 @@ export default function App() {
 
       const sessao = criarSessao(dados);
 
+      // No cadastro pode ser necessário confirmar o e-mail antes de ter uma sessão.
       if (!sessao) {
         if (aba === 'criar' && (dados.user || dados.id)) {
           Alert.alert(
@@ -100,6 +103,7 @@ export default function App() {
       await salvarSessao(sessao);
 
       if (aba === 'criar') {
+        // Depois de criar a conta, salvo também o nome do perfil.
         const perfilResposta = await salvarPerfil(
           sessao.user.id,
           nome.trim(),
@@ -147,7 +151,7 @@ export default function App() {
         </Text>
 
         <View style={styles.card}>
-          {/* Barra de Seleção de Abas */}
+          {/* Essa barra escolhe entre entrar e criar uma conta. */}
           <View style={styles.abas}>
             <Pressable
               style={[styles.aba, aba === 'entrar' && styles.abaAtiva]}

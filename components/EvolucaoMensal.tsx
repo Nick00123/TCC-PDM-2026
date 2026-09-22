@@ -14,16 +14,19 @@ type Props = {
 };
 
 export default function EvolucaoMensal({ transacoes }: Props) {
+  // Pego a largura da tela para o gráfico não ficar cortado.
   const { width } = useWindowDimensions();
   const largura = width - 64;
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const anoAtual = new Date().getFullYear();
 
+  // Primeiro separo só as transações do ano atual.
   const transacoesDoAno = transacoes.filter((transacao) => {
     const [ano] = transacao.data.split('-').map(Number);
     return ano === anoAtual;
   });
 
+  // Aqui somo receitas e despesas de cada mês.
   const dados = MESES.map((label, i) => {
     const receita = transacoesDoAno
       .filter((t: Transacao) => {
@@ -42,6 +45,7 @@ export default function EvolucaoMensal({ transacoes }: Props) {
     return { x: i + 1, mes: label, receita, despesa };
   });
 
+  // O botão mostra apenas uma metade do ano por vez.
   const dadosSemestre = semestre === 1 ? dados.slice(0, 6) : dados.slice(6, 12);
   const labelsDoSemestre = dadosSemestre.map((d) => d.mes);
 
@@ -58,6 +62,7 @@ export default function EvolucaoMensal({ transacoes }: Props) {
 
   return (
     <View style={styles.card}>
+      {/* Esses botões trocam entre os dois semestres. */}
       <View style={styles.cabecalho}>
         <Text style={styles.titulo}>Evolução mensal</Text>
 

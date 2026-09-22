@@ -10,9 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import type { Notificacao } from '../types';
-
-type Resultado = { sucesso: boolean; mensagem: string };
+import type { Notificacao, ResultadoOperacao } from '../types';
 
 type Props = {
   visivel: boolean;
@@ -20,9 +18,9 @@ type Props = {
   notificacoes: Notificacao[];
   carregando: boolean;
   erro: string | null;
-  marcarLida: (id: string) => Promise<Resultado>;
-  marcarTodasLidas: () => Promise<Resultado>;
-  excluir: (id: string) => Promise<Resultado>;
+  marcarLida: (id: string) => Promise<ResultadoOperacao>;
+  marcarTodasLidas: () => Promise<ResultadoOperacao>;
+  excluir: (id: string) => Promise<ResultadoOperacao>;
 };
 
 const CORES_TIPO: { [key: string]: { fundo: string; cor: string } } = {
@@ -40,6 +38,7 @@ const ICONES_TIPO: { [key: string]: React.ReactNode } = {
 };
 
 function formatarTempo(criadaEm: string): string {
+  // Transformo a data em um texto mais fácil de entender, tipo "5 min atrás".
   const data = new Date(criadaEm);
   if (isNaN(data.getTime())) return '';
   const agora = new Date();
@@ -63,11 +62,13 @@ export default function NotificacoesModal({
   marcarTodasLidas,
   excluir,
 }: Props) {
+  // Esses estados impedem repetir uma ação enquanto ela ainda está carregando.
   const [marcandoId, setMarcandoId] = useState<string | null>(null);
   const [marcandoTodas, setMarcandoTodas] = useState(false);
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   const lerNotificacao = async (item: Notificacao) => {
+    // Notificação já lida não precisa chamar a API outra vez.
     if (item.lida || marcandoId === item.id) return;
 
     setMarcandoId(item.id);
@@ -102,6 +103,7 @@ export default function NotificacoesModal({
   };
 
   const confirmarExclusao = (id: string) => {
+    // Peço confirmação porque essa ação apaga a notificação.
     if (excluindoId === id) return;
 
     Alert.alert('Excluir notificação', 'Deseja realmente excluir esta notificação?', [
@@ -128,6 +130,7 @@ export default function NotificacoesModal({
   };
 
   const renderItem = ({ item }: { item: Notificacao }) => {
+    // O tipo escolhe as cores e o ícone de cada item.
     const estilo = CORES_TIPO[item.tipo] || CORES_TIPO.sistema;
     const icone = ICONES_TIPO[item.tipo] || ICONES_TIPO.sistema;
 

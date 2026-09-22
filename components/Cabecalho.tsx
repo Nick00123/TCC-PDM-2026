@@ -1,18 +1,16 @@
 import { Bell } from 'lucide-react-native';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { Notificacao, ResultadoOperacao } from '../types';
 import NotificacoesModal from './NotificacoesModal';
-import type { Notificacao } from '../types';
-
-type Resultado = { sucesso: boolean; mensagem: string };
 
 type Props = {
   notificacoes: Notificacao[];
   carregando: boolean;
   erro: string | null;
-  marcarLida: (id: string) => Promise<Resultado>;
-  marcarTodasLidas: () => Promise<Resultado>;
-  excluir: (id: string) => Promise<Resultado>;
+  marcarLida: (id: string) => Promise<ResultadoOperacao>;
+  marcarTodasLidas: () => Promise<ResultadoOperacao>;
+  excluir: (id: string) => Promise<ResultadoOperacao>;
 };
 
 export default function Cabecalho({

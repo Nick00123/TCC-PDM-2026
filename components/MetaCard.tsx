@@ -8,6 +8,7 @@ type Props = {
 };
 
 export default function MetaCard({ titulo, atual, total }: Props) {
+  // Calculo quanto da meta já foi completado.
   const pct = total > 0 ? Math.round((atual / total) * 100) : 0;
 
   return (
@@ -18,6 +19,7 @@ export default function MetaCard({ titulo, atual, total }: Props) {
       </View>
 
       <View style={styles.progressoBg}>
+        {/* A barra não pode passar de 100% visualmente. */}
         <View style={[styles.progressoFill, { width: `${Math.min(pct, 100)}%` }]} />
       </View>
 

@@ -1,35 +1,33 @@
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  useWindowDimensions,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  Calendar as CalendarIcon,
-  PieChart,
-  TrendingUp,
+    ArrowDownRight,
+    ArrowUpRight,
+    Calendar as CalendarIcon,
+    PieChart,
+    TrendingUp,
 } from 'lucide-react-native';
 import {
-  VictoryArea,
-  VictoryAxis,
-  VictoryChart,
-  VictoryLine,
-  VictoryPie,
-  VictoryTheme,
+    VictoryArea,
+    VictoryAxis,
+    VictoryChart,
+    VictoryLine,
+    VictoryPie,
+    VictoryTheme,
 } from 'victory-native';
-import type { Transacao } from '../../types';
-import { buscarTransacoes } from '../../utils/requisicoes';
 import SeletorMesModal from '../../components/SeletorMesModal';
+import type { AbaRelatorio, Transacao } from '../../types';
+import { buscarTransacoes } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
-
-type Aba = 'geral' | 'categorias' | 'tendencias';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const COR_RECEITA = '#1a9e75';
@@ -37,12 +35,14 @@ const COR_DESPESA = '#e24b4a';
 const CORES_CATEG = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 
 const formatarEixoY = (valor: number) => {
+  // Deixo os valores do eixo menores para não ocupar tanto espaço.
   if (valor === 0) return 'R$0';
   if (Math.abs(valor) >= 1000) return `R$${(valor / 1000).toFixed(0)}k`;
   return `R$${Math.round(valor)}`;
 };
 
 const obterAnoMes = (data: string) => {
+  // Transformo a data em números que facilitam os filtros do relatório.
   const [ano, mes] = data.split('-').map(Number);
   return { ano, mes: mes - 1 };
 };
@@ -68,6 +68,7 @@ export default function Relatorios() {
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
 
   const carregarTransacoes = useCallback(async () => {
+    // O relatório sempre usa as transações mais recentes do usuário.
     setCarregandoTransacoes(true);
     try {
       const usuario = await obterUsuarioDaSessao();
@@ -84,7 +85,7 @@ export default function Relatorios() {
       void carregarTransacoes();
     }, [carregarTransacoes])
   );
-  const [aba, setAba] = useState<Aba>('geral');
+  const [aba, setAba] = useState<AbaRelatorio>('geral');
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const [mesSelecionado, setMesSelecionado] = useState<number>(new Date().getMonth());
   const anoSelecionado = new Date().getFullYear();
@@ -96,6 +97,7 @@ export default function Relatorios() {
   // Ajuste do padding do container para evitar corte nas bordas do celular
   const larguraGrafico = width - 70;
 
+  // Primeiro filtro pelo ano atual e depois pelo mês escolhido.
   const transacoesDoAno = transacoes.filter((t: Transacao) => {
     const { ano } = obterAnoMes(t.data);
     return ano === anoSelecionado;
@@ -106,6 +108,7 @@ export default function Relatorios() {
     return mes === mesSelecionado;
   });
 
+  // Os cards de resumo mostram apenas o mês selecionado.
   const totalReceitas = transacoesFiltradas
     .filter((t: Transacao) => t.tipo === 'receita')
     .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
@@ -119,6 +122,7 @@ export default function Relatorios() {
     ? ((economizado / totalReceitas) * 100).toFixed(1)
     : '0.0';
 
+  // Esses dados alimentam os gráficos de evolução e tendência.
   const dadosMeses = MESES.map((label, i) => {
     const receita = transacoesDoAno
       .filter((t: Transacao) => t.tipo === 'receita' && obterAnoMes(t.data).mes === i)
@@ -214,15 +218,15 @@ export default function Relatorios() {
         </View>
       </View>
 
-      {/* ── SELETOR DE ABAS ── */}
+      {/* As três abas mostram jeitos diferentes de olhar os mesmos dados. */}
       <View style={styles.abas}>
         {(
           [
             ['geral', 'Visão Geral'],
             ['categorias', 'Categorias'],
             ['tendencias', 'Tendências'],
-          ] as [Aba, string][]
-        ).map(([key, label]) => (
+          ] as [AbaRelatorio, string][]
+          ).map(([key, label]) => (
           <TouchableOpacity
             key={key}
             style={[styles.aba, aba === key && styles.abaAtiva]}

@@ -10,6 +10,7 @@ type Props = {
 };
 
 export default function TransacaoItem({ descricao, categoria, valor, tipo }: Props) {
+  // O tipo muda o ícone, a cor e o sinal do valor.
   const isReceita = tipo === 'receita';
   const Icone = isReceita ? ArrowUpRight : ArrowDownLeft;
 

@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'reac
 type NovaMetaProps = { visivel: boolean; titulo: string; total: string; salvando: boolean; setTitulo: (valor: string) => void; setTotal: (valor: string) => void; salvar: () => void; fechar: () => void };
 
 export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, setTotal, salvar, fechar }: NovaMetaProps) {
+  // Esse modal pega os dados necessários para criar uma meta nova.
   return (
     <Modal visible={visivel} animationType="slide" transparent>
       <View style={styles.overlay}><View style={styles.card}>
@@ -21,6 +22,7 @@ export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, set
 type DepositoProps = { visivel: boolean; valor: string; depositando: boolean; setValor: (valor: string) => void; confirmar: () => void; fechar: () => void };
 
 export function ModalDeposito({ visivel, valor, depositando, setValor, confirmar, fechar }: DepositoProps) {
+  // Esse outro modal serve só para colocar dinheiro em uma meta existente.
   return (
     <Modal visible={visivel} animationType="slide" transparent>
       <View style={styles.overlay}><View style={styles.card}>

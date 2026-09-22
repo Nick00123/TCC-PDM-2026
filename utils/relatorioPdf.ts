@@ -1,7 +1,8 @@
 import { Image } from 'react-native';
-import type { Meta, Transacao } from '../types';
+import type { DadosRelatorio, Meta, Transacao } from '../types';
 import { formatarMoeda } from './formatacao';
 
+// As cores que vão aparecer nas fatias do gráfico de categorias
 const CORES_CATEGORIAS = [
   '#1A9E75',
   '#F59E0B',
@@ -11,18 +12,16 @@ const CORES_CATEGORIAS = [
   '#F97316',
   '#64748B',
 ];
+
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+// Altura fixa usada para calcular as barras do gráfico no HTML.
 const ALTURA_GRAFICO = 170;
 
-type DadosRelatorio = {
-  email: string;
-  transacoes: Transacao[];
-  metas: Meta[];
-  logoDataUrl: string;
-  dataGeracao?: Date;
-};
-
+// O formato das informações que a gente precisa para montar o relatório
+// Limpa caracteres estranhos do texto para o HTML não quebrar ou dar erro
 function escaparHtml(valor: string) {
+  // Troco caracteres especiais para eles não quebrarem o HTML do relatório.
   return valor
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -31,11 +30,15 @@ function escaparHtml(valor: string) {
     .replace(/'/g, '&#039;');
 }
 
+// Transforma um número em formato de dinheiro bonitinho (ex: R$ 10,00)
 function moeda(valor: number) {
+  // Deixo todos os valores do PDF com o mesmo formato de dinheiro.
   return `R$ ${formatarMoeda(valor)}`;
 }
 
+// Transforma o arquivo da imagem da logo em texto (base64) para o PDF conseguir ler
 function blobParaDataUrl(blob: Blob): Promise<string> {
+  // O PDF precisa receber a imagem como texto base64.
   return new Promise((resolve, reject) => {
     const leitor = new FileReader();
     leitor.onloadend = () => {
@@ -47,7 +50,9 @@ function blobParaDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+// Pega a imagem da logo do app e prepara para usar no relatório
 export async function obterLogoRelatorio(): Promise<string> {
+  // Carrego a logo do próprio projeto para colocar no cabeçalho do PDF.
   const origem = Image.resolveAssetSource(require('../assets/images/fundoTransparante.png'));
   if (!origem?.uri) throw new Error('Logo do EduFinance não encontrada.');
   if (origem.uri.startsWith('data:')) return origem.uri;
@@ -57,7 +62,9 @@ export async function obterLogoRelatorio(): Promise<string> {
   return blobParaDataUrl(await resposta.blob());
 }
 
+// Junta todas as despesas por categoria, soma os valores e calcula a porcentagem de cada uma
 function calcularCategorias(transacoes: Transacao[]) {
+  // Junto as despesas por categoria antes de calcular as porcentagens.
   const totais = new Map<string, number>();
   transacoes
     .filter((transacao) => transacao.tipo === 'despesa')
@@ -76,7 +83,9 @@ function calcularCategorias(transacoes: Transacao[]) {
     .sort((a, b) => b.valor - a.valor);
 }
 
+// Desenha o gráfico de pizza/rosca com as fatias coloridas e monta a legenda do lado
 function criarGraficoCategorias(categorias: ReturnType<typeof calcularCategorias>) {
+  // Se não houver despesas, mostro uma mensagem no lugar do gráfico.
   if (categorias.length === 0) {
     return '<div class="estado-vazio">Nenhuma despesa cadastrada para exibir por categoria.</div>';
   }
@@ -109,6 +118,7 @@ function criarGraficoCategorias(categorias: ReturnType<typeof calcularCategorias
   `;
 }
 
+// Arredonda o valor máximo do gráfico para ficar com um número bonito na régua (escala)
 function arredondarEscala(valor: number) {
   if (valor <= 0) return 0;
   const magnitude = 10 ** Math.floor(Math.log10(valor));
@@ -117,7 +127,9 @@ function arredondarEscala(valor: number) {
   return fator * magnitude;
 }
 
+// Separa os dados mês a mês do semestre para ver quanto entrou e quanto saiu de dinheiro
 function calcularSemestre(transacoes: Transacao[], dataReferencia: Date) {
+  // O relatório divide o ano em janeiro-junho ou julho-dezembro.
   const ano = dataReferencia.getFullYear();
   const inicio = dataReferencia.getMonth() < 6 ? 0 : 6;
   const meses = Array.from({ length: 6 }, (_, indice) => inicio + indice);
@@ -142,7 +154,9 @@ function calcularSemestre(transacoes: Transacao[], dataReferencia: Date) {
   return { dados, escalaMaxima: arredondarEscala(maiorValor) };
 }
 
+// Cria o visual do gráfico de barras comparando receitas e despesas ao longo dos meses
 function criarGraficoEvolucao(transacoes: Transacao[], dataReferencia: Date) {
+  // Aqui monto as barras de receitas e despesas de cada mês.
   const { dados, escalaMaxima } = calcularSemestre(transacoes, dataReferencia);
   const quantidadeIntervalos = 5;
   const linhas = Array.from({ length: quantidadeIntervalos + 1 }, (_, indice) => {
@@ -178,7 +192,9 @@ function criarGraficoEvolucao(transacoes: Transacao[], dataReferencia: Date) {
   `;
 }
 
+// Cria a barrinha de progresso de cada meta que o usuário ainda está tentando alcançar
 function criarMetas(metas: Meta[]) {
+  // Só aparecem as metas que ainda não foram concluídas.
   const emAndamento = metas.filter((meta) => meta.atual < meta.total);
   if (emAndamento.length === 0) {
     return '<div class="estado-vazio">Nenhuma meta em andamento no momento.</div>';
@@ -201,6 +217,7 @@ function criarMetas(metas: Meta[]) {
   }).join('');
 }
 
+// A função principal que junta tudo (cabeçalho, gráficos, metas) e monta o HTML completão do PDF
 export function criarHtmlRelatorioPdf({
   email,
   transacoes,
@@ -208,6 +225,7 @@ export function criarHtmlRelatorioPdf({
   logoDataUrl,
   dataGeracao = new Date(),
 }: DadosRelatorio) {
+  // Essa função junta os cálculos e o HTML que depois vira arquivo PDF.
   const receitas = transacoes.filter((item) => item.tipo === 'receita');
   const despesas = transacoes.filter((item) => item.tipo === 'despesa');
   const totalReceitas = receitas.reduce((soma, item) => soma + item.valor, 0);
@@ -282,6 +300,7 @@ export function criarHtmlRelatorioPdf({
     </head>
     <body>
       <main class="pagina">
+        <!-- Cabeçalho do relatório com a logo e o e-mail -->
         <header class="cabecalho">
           <div class="marca">
             <div class="logo-wrap"><img class="logo" src="${logoDataUrl}" alt="Logo EduFinance" /></div>
@@ -294,6 +313,7 @@ export function criarHtmlRelatorioPdf({
           </div>
         </header>
 
+        <!-- Bloco de resumo com total de receitas, despesas e saldo -->
         <section class="secao">
           <h2>Resumo financeiro</h2>
           <div class="cards-resumo">
@@ -303,10 +323,16 @@ export function criarHtmlRelatorioPdf({
           </div>
         </section>
 
+        <!-- Seção do Gráfico de Categorias -->
         <section class="secao"><h2>Gastos por categoria</h2>${criarGraficoCategorias(categorias)}</section>
+        
+        <!-- Seção do Gráfico de Evolução dos Meses -->
         <section class="secao"><h2>Evolução financeira</h2>${criarGraficoEvolucao(transacoes, dataGeracao)}</section>
+        
+        <!-- Seção de Metas -->
         <section class="secao"><h2>Metas em andamento</h2>${criarMetas(metas)}</section>
 
+        <!-- Resumo geral de quantas movimentações foram feitas -->
         <section class="secao">
           <h2>Resumo das movimentações</h2>
           <div class="movimentacoes">
@@ -316,6 +342,7 @@ export function criarHtmlRelatorioPdf({
           </div>
         </section>
 
+        <!-- Rodapé do PDF -->
         <footer class="rodape">Relatório gerado automaticamente pelo EduFinance<strong>Organize hoje, planeje amanhã</strong></footer>
       </main>
     </body>

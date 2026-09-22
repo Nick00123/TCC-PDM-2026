@@ -16,6 +16,7 @@ type Props = {
 };
 
 export default function FormularioTransacao({ tipo, valor, descricao, categoria, categorias, salvando, setValor, setDescricao, setCategoria, fechar, salvar }: Props) {
+  // O mesmo formulário serve para receita e despesa.
   return (
     <Modal visible={tipo !== null} animationType="slide" transparent>
       <View style={styles.overlay}><View style={styles.card}>
@@ -24,11 +25,13 @@ export default function FormularioTransacao({ tipo, valor, descricao, categoria,
           <TouchableOpacity onPress={fechar} disabled={salvando}><X size={22} color="#666" /></TouchableOpacity>
         </View>
         <Text style={styles.label}>Valor (R$)</Text>
+        {/* Os campos são controlados pela tela de transações. */}
         <TextInput style={styles.inputValor} placeholder="0,00" keyboardType="decimal-pad" value={valor} onChangeText={setValor} />
         <Text style={styles.label}>Descrição</Text>
         <TextInput style={styles.input} placeholder="Ex: Mercado" value={descricao} onChangeText={setDescricao} />
         <Text style={styles.label}>Categoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorias}>
+          {/* Cada categoria vira um botãozinho para selecionar. */}
           {categorias.map((item) => (
             <TouchableOpacity key={item} style={[styles.chip, categoria === item && styles.chipAtivo]} onPress={() => setCategoria(item)}>
               <Text style={[styles.chipTexto, categoria === item && styles.chipTextoAtivo]}>{item}</Text>

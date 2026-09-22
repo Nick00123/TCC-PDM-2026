@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { BookOpen, LineChart, PiggyBank, Sparkles, Target, Wallet } from 'lucide-react-native';
-import React from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obterSessaoValida } from '../utils/sessao';
 
+// Lista usada para montar os cartões de apresentação sem repetir código.
 const RECURSOS = [
   {
     icone: <Wallet size={22} color="#1A9E75" />,
@@ -31,6 +31,7 @@ export default function Intro() {
   const router = useRouter();
 
   const irPara = async (aba: 'entrar' | 'criar') => {
+    // Se a pessoa já entrou antes, ela não precisa ver o login de novo.
     const sessao = await obterSessaoValida();
     if (sessao) {
       router.replace('/(tabs)');
@@ -58,6 +59,7 @@ export default function Intro() {
 
       {/* Recursos */}
       <View style={styles.cards}>
+        {/* Os recursos são mostrados a partir da lista acima. */}
         {RECURSOS.map((r) => (
           <View key={r.titulo} style={styles.card}>
             <View style={styles.cardIcone}>{r.icone}</View>

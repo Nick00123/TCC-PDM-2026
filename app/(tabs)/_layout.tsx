@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
-import { Home, ArrowLeftRight, BarChart2, Lightbulb, User, Target } from 'lucide-react-native';
+import { ArrowLeftRight, BarChart2, Home, Lightbulb, Target, User } from 'lucide-react-native';
 
 export default function TabsLayout() {
+  // Cada Tabs.Screen vira uma opção na barra inferior do app.
   return (
     <Tabs
       screenOptions={{

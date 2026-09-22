@@ -1,4 +1,4 @@
-import type { Meta, Notificacao, Transacao } from '../types';
+import type { ContextoAnalise, Meta, Notificacao, Transacao } from '../types';
 import { diagnosticarErroJwt, endpointAuth, endpointRest, headersAutenticados, headersPublicos, SUPABASE_URL } from './sessao';
 
 type Headers = Record<string, string>;
@@ -7,6 +7,7 @@ const ESPERA_MAXIMA_JWT_MS = 5000;
 const MARGEM_ESPERA_JWT_MS = 250;
 
 function erroJwtEmitidoNoFuturo(corpoErro: string) {
+  // Esse erro aparece quando o relógio do servidor ainda não chegou no horário do token.
   try {
     const erro = JSON.parse(corpoErro) as { code?: unknown; message?: unknown };
     return erro.code === 'PGRST303'
@@ -22,6 +23,7 @@ function aguardar(ms: number) {
 }
 
 export async function requisicaoRest(caminho: string, opcoes: RequestInit = {}) {
+  // Se o JWT parecer adiantado, espero um pouco e tento a chamada de novo.
   const executar = () => fetch(endpointRest(caminho), opcoes);
   const primeiraResposta = await executar();
 
@@ -52,6 +54,7 @@ async function lerResposta(resposta: Response) {
 }
 
 async function lerAlteracaoComRegistro(resposta: Response) {
+  // DELETE e PATCH precisam devolver algum registro para eu saber que funcionaram.
   await lerResposta(resposta);
   const registros = await resposta.json();
   if (!Array.isArray(registros) || registros.length === 0) {
@@ -60,6 +63,7 @@ async function lerAlteracaoComRegistro(resposta: Response) {
 }
 
 export async function buscarTransacoes(usuarioId: string, headers: Headers): Promise<Transacao[]> {
+  // O usuario_id no filtro evita misturar dados de contas diferentes.
   const caminho = `transacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=data.desc`;
   const resposta = await lerResposta(await requisicaoRest(caminho, { headers }));
   const lista = await resposta.json();
@@ -127,6 +131,7 @@ export async function consultarValoresMeta(usuarioId: string, id: string, header
 }
 
 export async function atualizarValorMeta(usuarioId: string, id: string, valorAnterior: number, novoValor: number, headers: Headers) {
+  // Também confiro o valor anterior para não sobrescrever uma mudança recente.
   const filtro = `id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}&valor_atual=eq.${encodeURIComponent(valorAnterior)}`;
   await lerAlteracaoComRegistro(await requisicaoRest(`metas?${filtro}`, {
     method: 'PATCH',
@@ -206,14 +211,8 @@ export async function salvarPerfil(usuarioId: string, nome: string, headers: Hea
   });
 }
 
-export type ContextoAnalise = {
-  receitas: number;
-  despesas: number;
-  metas: object[];
-  dicasDisponiveis: object[];
-};
-
 export async function pedirAnalise(contexto: ContextoAnalise): Promise<string> {
+  // O prompt limita a resposta para ela ficar curta e útil dentro do app.
   const prompt = `
 Você é um mentor financeiro educativo, empático e objetivo do app EduFinance.
 Analise somente os dados fornecidos. Não invente valores nem prometa rendimentos.

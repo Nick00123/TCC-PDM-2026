@@ -1,6 +1,6 @@
+import { useFocusEffect } from 'expo-router';
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { useFocusEffect } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ModalDeposito, ModalNovaMeta } from '../../components/MetasModais';
 import type { Meta } from '../../types';
@@ -22,6 +22,7 @@ export default function Metas() {
   const [excluindoId, setExcluindoId] = useState<string | null>(null);
 
   async function carregarMetas() {
+    // Atualizo as metas quando a tela abre para mostrar os valores atuais.
     setCarregandoMetas(true);
     try {
       const usuario = await obterUsuarioDaSessao();
@@ -67,6 +68,7 @@ export default function Metas() {
     const registro = await consultarValoresMeta(usuario.id, id, headers);
     if (!registro) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
     const valorAnterior = Number(registro.valor_atual);
+    // Busco o valor de novo para não apagar uma alteração feita em outro lugar.
     const novoValor = valorAnterior + valor;
     await atualizarValorMeta(usuario.id, id, valorAnterior, novoValor, headers);
     await carregarMetas();
@@ -82,6 +84,7 @@ export default function Metas() {
   );
 
   const salvar = async () => {
+    // Antes de mandar para o banco, confiro os campos e transformo a vírgula em ponto.
     if (salvando) return;
 
     const tituloLimpo = titulo.trim();
@@ -169,6 +172,7 @@ export default function Metas() {
     }
 
     const restante = meta.total - meta.atual;
+    // Não deixo depositar mais dinheiro do que falta para a meta.
     if (restante <= 0) {
       Alert.alert('Meta concluída', 'Esta meta já foi concluída.');
       return;
