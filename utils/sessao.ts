@@ -1,14 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const urlConfigurada = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const chaveConfigurada = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const urlSupabaseConfigurada = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const chaveAnonimaConfigurada = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!urlConfigurada || !chaveConfigurada) {
+if (!urlSupabaseConfigurada || !chaveAnonimaConfigurada) {
   throw new Error('Variáveis de ambiente do Supabase não configuradas.');
 }
 
-export const SUPABASE_URL: string = urlConfigurada;
-export const SUPABASE_ANON_KEY: string = chaveConfigurada;
+export const SUPABASE_URL: string = urlSupabaseConfigurada;
+export const SUPABASE_ANON_KEY: string = chaveAnonimaConfigurada;
 
 const CHAVE_SESSAO = '@edufinance:sessao-http';
 // Renovo um pouco antes de vencer para evitar erro no meio de uma requisição.
@@ -35,8 +35,10 @@ type RespostaRefresh = {
   user?: Sessao['user'];
 };
 
-let refreshEmAndamento: Promise<Sessao | null> | null = null;
+let renovacaoEmAndamento: Promise<Sessao | null> | null = null;
 
+// Monta os cabeçalhos usados em chamadas que não exigem uma sessão autenticada.
+// Não recebe argumentos; retorna a chave pública e o tipo de conteúdo JSON.
 export function headersPublicos(): Record<string, string> {
   // Esses headers são suficientes para chamadas públicas do Supabase.
   return {
@@ -45,40 +47,50 @@ export function headersPublicos(): Record<string, string> {
   };
 }
 
-export function endpointAuth(caminho: string): string {
-  return `${SUPABASE_URL}/auth/v1/${caminho}`;
+// Monta o endpoint de autenticação a partir do caminho informado.
+// Recebe o caminho da rota e retorna a URL completa de autenticação.
+export function endpointAuth(caminhoEndpoint: string): string {
+  return `${SUPABASE_URL}/auth/v1/${caminhoEndpoint}`;
 }
 
-export function endpointRest(caminho: string): string {
-  return `${SUPABASE_URL}/rest/v1/${caminho}`;
+// Monta o endpoint REST a partir do caminho informado.
+// Recebe o caminho da consulta e retorna a URL completa da API REST.
+export function endpointRest(caminhoEndpoint: string): string {
+  return `${SUPABASE_URL}/rest/v1/${caminhoEndpoint}`;
 }
 
-export function criarSessao(dados: RespostaRefresh): Sessao | null {
+// Valida a resposta de autenticação e converte seus campos para o tipo Sessao.
+// Recebe a resposta do refresh; retorna uma sessão completa ou null se faltar dado.
+export function criarSessao(dadosDaResposta: RespostaRefresh): Sessao | null {
   // Se faltar algum dado importante, considero que a sessão veio inválida.
   if (
-    !dados.access_token ||
-    !dados.refresh_token ||
-    (!dados.expires_in && !dados.expires_at) ||
-    !dados.user
+    !dadosDaResposta.access_token ||
+    !dadosDaResposta.refresh_token ||
+    (!dadosDaResposta.expires_in && !dadosDaResposta.expires_at) ||
+    !dadosDaResposta.user
   ) {
     return null;
   }
 
   return {
-    accessToken: dados.access_token,
-    refreshToken: dados.refresh_token,
-    expiresAt: dados.expires_at
-      ? dados.expires_at * 1000
-      : Date.now() + (dados.expires_in ?? 3600) * 1000,
-    user: dados.user,
+    accessToken: dadosDaResposta.access_token,
+    refreshToken: dadosDaResposta.refresh_token,
+    expiresAt: dadosDaResposta.expires_at
+      ? dadosDaResposta.expires_at * 1000
+      : Date.now() + (dadosDaResposta.expires_in ?? 3600) * 1000,
+    user: dadosDaResposta.user,
   };
 }
 
+// Persiste a sessão localmente para reutilizá-la entre aberturas do aplicativo.
+// Recebe uma sessão válida; não retorna conteúdo.
 export async function salvarSessao(sessao: Sessao): Promise<void> {
   // A sessão fica salva para a pessoa não precisar entrar toda hora.
   await AsyncStorage.setItem(CHAVE_SESSAO, JSON.stringify(sessao));
 }
 
+// Lê e converte a sessão armazenada no dispositivo.
+// Não recebe argumentos; retorna a sessão salva ou null se estiver ausente/inválida.
 export async function carregarSessao(): Promise<Sessao | null> {
   const sessaoSalva = await AsyncStorage.getItem(CHAVE_SESSAO);
 
@@ -92,13 +104,17 @@ export async function carregarSessao(): Promise<Sessao | null> {
   }
 }
 
+// Remove do armazenamento local os dados de autenticação salvos.
+// Não recebe argumentos nem retorna conteúdo.
 export async function removerSessao(): Promise<void> {
   await AsyncStorage.removeItem(CHAVE_SESSAO);
 }
 
+// Renova a sessão com o refresh token e salva o novo access token.
+// Recebe a sessão atual; retorna a sessão renovada ou a versão mais recente salva.
 async function renovarSessao(sessao: Sessao): Promise<Sessao | null> {
   // Uso o refresh token para conseguir um access token novo.
-  const resposta = await fetch(
+  const respostaDaApi = await fetch(
     `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
     {
       method: 'POST',
@@ -107,8 +123,8 @@ async function renovarSessao(sessao: Sessao): Promise<Sessao | null> {
     }
   );
 
-  if (!resposta.ok) {
-    if (resposta.status === 400 || resposta.status === 401) {
+  if (!respostaDaApi.ok) {
+    if (respostaDaApi.status === 400 || respostaDaApi.status === 401) {
       const sessaoAtual = await carregarSessao();
 
       if (sessaoAtual?.refreshToken === sessao.refreshToken) {
@@ -119,11 +135,11 @@ async function renovarSessao(sessao: Sessao): Promise<Sessao | null> {
     throw new Error('Não foi possível renovar a sessão.');
   }
 
-  const dados = (await resposta.json()) as RespostaRefresh;
+  const dadosDaResposta = (await respostaDaApi.json()) as RespostaRefresh;
 
   const sessaoRenovada = criarSessao({
-    ...dados,
-    user: dados.user ?? sessao.user,
+    ...dadosDaResposta,
+    user: dadosDaResposta.user ?? sessao.user,
   });
 
   if (!sessaoRenovada) {
@@ -140,6 +156,8 @@ async function renovarSessao(sessao: Sessao): Promise<Sessao | null> {
   return sessaoRenovada;
 }
 
+// Obtém a sessão salva e a renova quando está próxima do vencimento.
+// Não recebe argumentos; retorna a sessão válida ou null se não houver sessão.
 export async function obterSessaoValida(): Promise<Sessao | null> {
   const sessao = await carregarSessao();
 
@@ -150,20 +168,24 @@ export async function obterSessaoValida(): Promise<Sessao | null> {
   }
 
   // Só uma renovação roda por vez, mesmo se várias telas pedirem a sessão.
-  if (!refreshEmAndamento) {
-    refreshEmAndamento = renovarSessao(sessao).finally(() => {
-      refreshEmAndamento = null;
+  if (!renovacaoEmAndamento) {
+    renovacaoEmAndamento = renovarSessao(sessao).finally(() => {
+      renovacaoEmAndamento = null;
     });
   }
 
-  return refreshEmAndamento;
+  return renovacaoEmAndamento;
 }
 
+// Obtém os dados do usuário da sessão atual, renovando a sessão se necessário.
+// Não recebe argumentos; retorna o usuário ou null quando não há sessão válida.
 export async function obterUsuarioDaSessao(): Promise<Sessao['user'] | null> {
   const sessao = await obterSessaoValida();
   return sessao?.user ?? null;
 }
 
+// Cria cabeçalhos autenticados com o access token da sessão válida.
+// Não recebe argumentos; retorna os cabeçalhos ou lança erro se não houver login.
 export async function headersAutenticados(): Promise<Record<string, string>> {
   // Esse header identifica a conta que está fazendo a requisição.
   const sessao = await obterSessaoValida();
@@ -178,29 +200,31 @@ export async function headersAutenticados(): Promise<Record<string, string>> {
   };
 }
 
+// Compara o horário de emissão do JWT com os relógios do cliente e servidor.
+// Recebe a Response, o corpo do erro e Authorization; retorna diferenças em segundos ou null.
 export function diagnosticarErroJwt(
-  resposta: Response,
+  respostaDaApi: Response,
   corpoErro: string,
-  authorization: string
+  cabecalhoAuthorization: string
 ): {
   iatAdiantadoServidorSegundos: number | null;
   iatAdiantadoClienteSegundos: number | null;
 } | null {
   // Tento descobrir se o horário do token ficou adiantado em relação ao servidor.
-  const erroNormalizado = corpoErro.toLowerCase();
+  const mensagemErroNormalizada = corpoErro.toLowerCase();
 
   if (
-    !erroNormalizado.includes('pgrst303') &&
-    !erroNormalizado.includes('jwt issued at future')
+    !mensagemErroNormalizada.includes('pgrst303') &&
+    !mensagemErroNormalizada.includes('jwt issued at future')
   ) {
     return null;
   }
 
-  let iat: number | null = null;
-  let exp: number | null = null;
+  let emissaoTokenEmSegundos: number | null = null;
+  let expiracaoTokenEmSegundos: number | null = null;
 
   try {
-    const token = authorization.replace(/^Bearer\s+/i, '');
+    const token = cabecalhoAuthorization.replace(/^Bearer\s+/i, '');
     const payloadBase64Url = token.split('.')[1];
 
     if (payloadBase64Url) {
@@ -216,29 +240,29 @@ export function diagnosticarErroJwt(
           )
           .join('')
       );
-      const payload = JSON.parse(payloadTexto);
+      const conteudoToken = JSON.parse(payloadTexto);
 
-      if (typeof payload.iat === 'number') iat = payload.iat;
-      if (typeof payload.exp === 'number') exp = payload.exp;
+      if (typeof conteudoToken.iat === 'number') emissaoTokenEmSegundos = conteudoToken.iat;
+      if (typeof conteudoToken.exp === 'number') expiracaoTokenEmSegundos = conteudoToken.exp;
     }
   } catch {
     // O diagnóstico continua sem expor o token quando o payload é inválido.
   }
 
   const agoraCliente = Math.floor(Date.now() / 1000);
-  const dataServidor = resposta.headers.get('Date');
+  const dataServidor = respostaDaApi.headers.get('Date');
   const horarioServidor = dataServidor
     ? Math.floor(Date.parse(dataServidor) / 1000)
     : null;
-  const iatAdiantadoClienteSegundos = iat === null ? null : iat - agoraCliente;
+  const iatAdiantadoClienteSegundos = emissaoTokenEmSegundos === null ? null : emissaoTokenEmSegundos - agoraCliente;
   const iatAdiantadoServidorSegundos =
-    iat === null || horarioServidor === null || Number.isNaN(horarioServidor)
+    emissaoTokenEmSegundos === null || horarioServidor === null || Number.isNaN(horarioServidor)
       ? null
-      : iat - horarioServidor;
+      : emissaoTokenEmSegundos - horarioServidor;
 
   console.warn('JWT diagnóstico: token emitido no futuro', {
-    iat: iat === null ? 'indisponível' : new Date(iat * 1000).toISOString(),
-    exp: exp === null ? 'indisponível' : new Date(exp * 1000).toISOString(),
+    iat: emissaoTokenEmSegundos === null ? 'indisponível' : new Date(emissaoTokenEmSegundos * 1000).toISOString(),
+    exp: expiracaoTokenEmSegundos === null ? 'indisponível' : new Date(expiracaoTokenEmSegundos * 1000).toISOString(),
     horarioLocal: new Date(agoraCliente * 1000).toISOString(),
     dataServidor: dataServidor ?? 'indisponível',
     iatAdiantadoClienteSegundos: iatAdiantadoClienteSegundos ?? 'indisponível',
@@ -247,3 +271,27 @@ export function diagnosticarErroJwt(
 
   return { iatAdiantadoServidorSegundos, iatAdiantadoClienteSegundos };
 }
+
+/*
+ARQUIVO: sessao.ts
+
+Responsabilidade:
+Gerenciar a sessão do usuário, os cabeçalhos de acesso e os endpoints do Supabase.
+
+Principais funções:
+- headersPublicos()
+- criarSessao()
+- carregarSessao()
+- obterSessaoValida()
+- headersAutenticados()
+
+Fluxo:
+Autenticação -> armazenamento local -> renovação quando necessário -> requisição autenticada
+
+Conceitos usados:
+- async/await
+- AsyncStorage
+- refresh token
+- Promise compartilhada para evitar renovações simultâneas
+- tipos e respostas do Supabase
+*/

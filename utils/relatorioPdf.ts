@@ -13,16 +13,18 @@ const CORES_CATEGORIAS = [
   '#64748B',
 ];
 
-const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const ABREVIACOES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 // Altura fixa usada para calcular as barras do gráfico no HTML.
-const ALTURA_GRAFICO = 170;
+const ALTURA_GRAFICO_PX = 170;
 
 // O formato das informações que a gente precisa para montar o relatório
 // Limpa caracteres estranhos do texto para o HTML não quebrar ou dar erro
-function escaparHtml(valor: string) {
+// Escapa caracteres especiais para que textos não sejam interpretados como marcação HTML.
+// Recebe um texto; retorna o mesmo conteúdo com os caracteres reservados codificados.
+function escaparTextoHtml(texto: string): string {
   // Troco caracteres especiais para eles não quebrarem o HTML do relatório.
-  return valor
+  return texto
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -31,13 +33,17 @@ function escaparHtml(valor: string) {
 }
 
 // Transforma um número em formato de dinheiro bonitinho (ex: R$ 10,00)
-function moeda(valor: number) {
+// Formata valores monetários com o símbolo usado no relatório.
+// Recebe um número; retorna um texto como "R$ 10,00".
+function formatarValorMonetario(valor: number): string {
   // Deixo todos os valores do PDF com o mesmo formato de dinheiro.
   return `R$ ${formatarMoeda(valor)}`;
 }
 
 // Transforma o arquivo da imagem da logo em texto (base64) para o PDF conseguir ler
-function blobParaDataUrl(blob: Blob): Promise<string> {
+// Converte os bytes de uma imagem em uma URL de dados que o HTML do PDF pode usar.
+// Recebe um Blob; resolve com a URL base64 ou rejeita se a leitura falhar.
+function converterBlobParaDataUrl(blob: Blob): Promise<string> {
   // O PDF precisa receber a imagem como texto base64.
   return new Promise((resolve, reject) => {
     const leitor = new FileReader();
@@ -50,59 +56,62 @@ function blobParaDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-// Pega a imagem da logo do app e prepara para usar no relatório
+// Carrega a logo do aplicativo e converte sua origem para o formato aceito pelo PDF.
+// Não recebe argumentos; retorna a URL da imagem ou lança erro se ela não puder ser lida.
 export async function obterLogoRelatorio(): Promise<string> {
   // Carrego a logo do próprio projeto para colocar no cabeçalho do PDF.
-  const origem = Image.resolveAssetSource(require('../assets/images/fundoTransparante.png'));
-  if (!origem?.uri) throw new Error('Logo do EduFinance não encontrada.');
-  if (origem.uri.startsWith('data:')) return origem.uri;
+  const origemImagem = Image.resolveAssetSource(require('../assets/images/fundoTransparante.png'));
+  if (!origemImagem?.uri) throw new Error('Logo do EduFinance não encontrada.');
+  if (origemImagem.uri.startsWith('data:')) return origemImagem.uri;
 
-  const resposta = await fetch(origem.uri);
-  if (!resposta.ok) throw new Error('Não foi possível carregar a logo do EduFinance.');
-  return blobParaDataUrl(await resposta.blob());
+  const respostaDaApi = await fetch(origemImagem.uri);
+  if (!respostaDaApi.ok) throw new Error('Não foi possível carregar a logo do EduFinance.');
+  return converterBlobParaDataUrl(await respostaDaApi.blob());
 }
 
-// Junta todas as despesas por categoria, soma os valores e calcula a porcentagem de cada uma
-function calcularCategorias(transacoes: Transacao[]) {
+// Agrupa despesas por categoria e calcula total, participação e cor de cada grupo.
+// Recebe as transações; retorna os dados ordenados do maior para o menor gasto.
+function calcularGastosPorCategoria(transacoes: Transacao[]) {
   // Junto as despesas por categoria antes de calcular as porcentagens.
-  const totais = new Map<string, number>();
+  const gastosPorCategoria = new Map<string, number>();
   transacoes
     .filter((transacao) => transacao.tipo === 'despesa')
     .forEach((transacao) => {
-      totais.set(transacao.categoria, (totais.get(transacao.categoria) ?? 0) + transacao.valor);
+      gastosPorCategoria.set(transacao.categoria, (gastosPorCategoria.get(transacao.categoria) ?? 0) + transacao.valor);
     });
 
-  const total = Array.from(totais.values()).reduce((soma, valor) => soma + valor, 0);
-  return Array.from(totais.entries())
-    .map(([nome, valor], indice) => ({
-      nome,
-      valor,
-      porcentagem: total > 0 ? (valor / total) * 100 : 0,
-      cor: CORES_CATEGORIAS[indice % CORES_CATEGORIAS.length],
+  const totalGastos = Array.from(gastosPorCategoria.values()).reduce((soma, valorCategoria) => soma + valorCategoria, 0);
+  return Array.from(gastosPorCategoria.entries())
+    .map(([nomeCategoria, valorCategoria], indiceCategoria) => ({
+      nome: nomeCategoria,
+      valor: valorCategoria,
+      porcentagem: totalGastos > 0 ? (valorCategoria / totalGastos) * 100 : 0,
+      cor: CORES_CATEGORIAS[indiceCategoria % CORES_CATEGORIAS.length],
     }))
-    .sort((a, b) => b.valor - a.valor);
+    .sort((categoriaA, categoriaB) => categoriaB.valor - categoriaA.valor);
 }
 
-// Desenha o gráfico de pizza/rosca com as fatias coloridas e monta a legenda do lado
-function criarGraficoCategorias(categorias: ReturnType<typeof calcularCategorias>) {
+// Monta o gráfico de rosca e sua legenda a partir dos totais por categoria.
+// Recebe os grupos calculados; retorna o trecho HTML do gráfico ou uma mensagem vazia.
+function criarGraficoCategorias(categorias: ReturnType<typeof calcularGastosPorCategoria>): string {
   // Se não houver despesas, mostro uma mensagem no lugar do gráfico.
   if (categorias.length === 0) {
     return '<div class="estado-vazio">Nenhuma despesa cadastrada para exibir por categoria.</div>';
   }
 
   const circunferencia = 2 * Math.PI * 55;
-  let deslocamento = 0;
-  const segmentos = categorias.map((categoria) => {
+  let deslocamentoGrafico = 0;
+  const segmentosGrafico = categorias.map((categoria) => {
     const tamanho = (categoria.porcentagem / 100) * circunferencia;
-    const segmento = `<circle cx="75" cy="75" r="55" fill="none" stroke="${categoria.cor}" stroke-width="34" stroke-dasharray="${tamanho} ${circunferencia - tamanho}" stroke-dashoffset="${-deslocamento}" transform="rotate(-90 75 75)" />`;
-    deslocamento += tamanho;
-    return segmento;
+    const segmentoGrafico = `<circle cx="75" cy="75" r="55" fill="none" stroke="${categoria.cor}" stroke-width="34" stroke-dasharray="${tamanho} ${circunferencia - tamanho}" stroke-dashoffset="${-deslocamentoGrafico}" transform="rotate(-90 75 75)" />`;
+    deslocamentoGrafico += tamanho;
+    return segmentoGrafico;
   }).join('');
 
-  const legenda = categorias.map((categoria) => `
+  const htmlLegenda = categorias.map((categoria) => `
     <div class="item-legenda">
       <span class="cor-legenda" style="background:${categoria.cor}"></span>
-      <span class="nome-legenda">${escaparHtml(categoria.nome)}</span>
+      <span class="nome-legenda">${escaparTextoHtml(categoria.nome)}</span>
       <strong>${categoria.porcentagem.toFixed(1).replace('.', ',')}%</strong>
     </div>
   `).join('');
@@ -110,37 +119,39 @@ function criarGraficoCategorias(categorias: ReturnType<typeof calcularCategorias
   return `
     <div class="categorias-layout">
       <svg class="grafico-pizza" viewBox="0 0 150 150" aria-label="Gráfico de gastos por categoria">
-        ${segmentos}
+        ${segmentosGrafico}
         <circle cx="75" cy="75" r="35" fill="#FFFFFF" />
       </svg>
-      <div class="legenda-categorias">${legenda}</div>
+      <div class="legenda-categorias">${htmlLegenda}</div>
     </div>
   `;
 }
 
-// Arredonda o valor máximo do gráfico para ficar com um número bonito na régua (escala)
-function arredondarEscala(valor: number) {
-  if (valor <= 0) return 0;
-  const magnitude = 10 ** Math.floor(Math.log10(valor));
-  const normalizado = valor / magnitude;
-  const fator = normalizado <= 1 ? 1 : normalizado <= 2 ? 2 : normalizado <= 5 ? 5 : 10;
-  return fator * magnitude;
+// Arredonda o limite da escala para um valor fácil de ler no gráfico.
+// Recebe o maior valor observado; retorna o limite arredondado ou zero.
+function arredondarEscala(valorMaximo: number): number {
+  if (valorMaximo <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(valorMaximo));
+  const valorNormalizado = valorMaximo / magnitude;
+  const fatorArredondamento = valorNormalizado <= 1 ? 1 : valorNormalizado <= 2 ? 2 : valorNormalizado <= 5 ? 5 : 10;
+  return fatorArredondamento * magnitude;
 }
 
-// Separa os dados mês a mês do semestre para ver quanto entrou e quanto saiu de dinheiro
-function calcularSemestre(transacoes: Transacao[], dataReferencia: Date) {
+// Separa receitas e despesas por mês no semestre que contém a data de referência.
+// Recebe transações e uma data; retorna os totais mensais e o limite da escala.
+function calcularDadosDoSemestre(transacoes: Transacao[], dataReferencia: Date) {
   // O relatório divide o ano em janeiro-junho ou julho-dezembro.
-  const ano = dataReferencia.getFullYear();
-  const inicio = dataReferencia.getMonth() < 6 ? 0 : 6;
-  const meses = Array.from({ length: 6 }, (_, indice) => inicio + indice);
+  const anoReferencia = dataReferencia.getFullYear();
+  const mesInicial = dataReferencia.getMonth() < 6 ? 0 : 6;
+  const indicesMeses = Array.from({ length: 6 }, (_, indice) => mesInicial + indice);
 
-  const dados = meses.map((mes) => {
+  const dadosMensais = indicesMeses.map((indiceMes) => {
     const transacoesDoMes = transacoes.filter((transacao) => {
       const [anoTransacao, mesTransacao] = transacao.data.split('-').map(Number);
-      return anoTransacao === ano && mesTransacao === mes + 1;
+      return anoTransacao === anoReferencia && mesTransacao === indiceMes + 1;
     });
     return {
-      mes: MESES[mes],
+      mes: ABREVIACOES_MESES[indiceMes],
       receitas: transacoesDoMes
         .filter((transacao) => transacao.tipo === 'receita')
         .reduce((soma, transacao) => soma + transacao.valor, 0),
@@ -150,32 +161,33 @@ function calcularSemestre(transacoes: Transacao[], dataReferencia: Date) {
     };
   });
 
-  const maiorValor = Math.max(0, ...dados.map((item) => Math.max(item.receitas, item.despesas)));
-  return { dados, escalaMaxima: arredondarEscala(maiorValor) };
+  const maiorValorMensal = Math.max(0, ...dadosMensais.map((dadosDoMes) => Math.max(dadosDoMes.receitas, dadosDoMes.despesas)));
+  return { dadosMensais, escalaMaxima: arredondarEscala(maiorValorMensal) };
 }
 
-// Cria o visual do gráfico de barras comparando receitas e despesas ao longo dos meses
+// Monta o gráfico de barras comparando receitas e despesas de cada mês do semestre.
+// Recebe as transações e a data de referência; retorna o trecho HTML do gráfico.
 function criarGraficoEvolucao(transacoes: Transacao[], dataReferencia: Date) {
   // Aqui monto as barras de receitas e despesas de cada mês.
-  const { dados, escalaMaxima } = calcularSemestre(transacoes, dataReferencia);
+  const { dadosMensais, escalaMaxima } = calcularDadosDoSemestre(transacoes, dataReferencia);
   const quantidadeIntervalos = 5;
-  const linhas = Array.from({ length: quantidadeIntervalos + 1 }, (_, indice) => {
-    const proporcao = indice / quantidadeIntervalos;
-    const valor = escalaMaxima * (1 - proporcao);
-    const rotulo = escalaMaxima === 0 && indice < quantidadeIntervalos ? '' : moeda(valor);
-    return `<div class="linha-escala" style="top:${proporcao * 100}%"><span>${rotulo}</span></div>`;
+  const linhasEscala = Array.from({ length: quantidadeIntervalos + 1 }, (_, indiceIntervalo) => {
+    const proporcaoEscala = indiceIntervalo / quantidadeIntervalos;
+    const valorEscala = escalaMaxima * (1 - proporcaoEscala);
+    const rotuloEscala = escalaMaxima === 0 && indiceIntervalo < quantidadeIntervalos ? '' : formatarValorMonetario(valorEscala);
+    return `<div class="linha-escala" style="top:${proporcaoEscala * 100}%"><span>${rotuloEscala}</span></div>`;
   }).join('');
 
-  const colunas = dados.map((item) => {
-    const alturaReceita = escalaMaxima > 0 ? (item.receitas / escalaMaxima) * ALTURA_GRAFICO : 0;
-    const alturaDespesa = escalaMaxima > 0 ? (item.despesas / escalaMaxima) * ALTURA_GRAFICO : 0;
+  const colunasMeses = dadosMensais.map((dadosDoMes) => {
+    const alturaReceita = escalaMaxima > 0 ? (dadosDoMes.receitas / escalaMaxima) * ALTURA_GRAFICO_PX : 0;
+    const alturaDespesa = escalaMaxima > 0 ? (dadosDoMes.despesas / escalaMaxima) * ALTURA_GRAFICO_PX : 0;
     return `
       <div class="coluna-mes">
         <div class="barras">
           <div class="barra receita" style="height:${alturaReceita}px"></div>
           <div class="barra despesa" style="height:${alturaDespesa}px"></div>
         </div>
-        <strong>${item.mes}</strong>
+        <strong>${dadosDoMes.mes}</strong>
       </div>
     `;
   }).join('');
@@ -186,38 +198,40 @@ function criarGraficoEvolucao(transacoes: Transacao[], dataReferencia: Date) {
       <span><i class="cor-despesa"></i> Despesa</span>
     </div>
     <div class="grafico-evolucao">
-      <div class="area-escala">${linhas}</div>
-      <div class="meses-grafico">${colunas}</div>
+      <div class="area-escala">${linhasEscala}</div>
+      <div class="meses-grafico">${colunasMeses}</div>
     </div>
   `;
 }
 
-// Cria a barrinha de progresso de cada meta que o usuário ainda está tentando alcançar
-function criarMetas(metas: Meta[]) {
+// Cria as barras de progresso das metas que ainda não foram concluídas.
+// Recebe a lista de metas; retorna o HTML das metas em andamento ou uma mensagem vazia.
+function criarHtmlMetas(metas: Meta[]): string {
   // Só aparecem as metas que ainda não foram concluídas.
-  const emAndamento = metas.filter((meta) => meta.atual < meta.total);
-  if (emAndamento.length === 0) {
+  const metasEmAndamento = metas.filter((metaAtual) => metaAtual.atual < metaAtual.total);
+  if (metasEmAndamento.length === 0) {
     return '<div class="estado-vazio">Nenhuma meta em andamento no momento.</div>';
   }
 
-  return emAndamento.map((meta) => {
-    const porcentagem = meta.total > 0
-      ? Math.min(100, Math.max(0, (meta.atual / meta.total) * 100))
+  return metasEmAndamento.map((metaAtual) => {
+    const porcentagem = metaAtual.total > 0
+      ? Math.min(100, Math.max(0, (metaAtual.atual / metaAtual.total) * 100))
       : 0;
     return `
       <div class="meta-item">
         <div class="meta-topo">
-          <strong>${escaparHtml(meta.titulo)}</strong>
+          <strong>${escaparTextoHtml(metaAtual.titulo)}</strong>
           <strong class="meta-porcentagem">${Math.round(porcentagem)}%</strong>
         </div>
-        <div class="meta-valores">${moeda(meta.atual)} de ${moeda(meta.total)}</div>
+        <div class="meta-valores">${formatarValorMonetario(metaAtual.atual)} de ${formatarValorMonetario(metaAtual.total)}</div>
         <div class="progresso"><div style="width:${porcentagem}%"></div></div>
       </div>
     `;
   }).join('');
 }
 
-// A função principal que junta tudo (cabeçalho, gráficos, metas) e monta o HTML completão do PDF
+// Calcula os resumos e reúne seções, gráficos e metas em um documento HTML para impressão.
+// Recebe os dados do relatório; retorna o HTML completo que será convertido em PDF.
 export function criarHtmlRelatorioPdf({
   email,
   transacoes,
@@ -226,12 +240,12 @@ export function criarHtmlRelatorioPdf({
   dataGeracao = new Date(),
 }: DadosRelatorio) {
   // Essa função junta os cálculos e o HTML que depois vira arquivo PDF.
-  const receitas = transacoes.filter((item) => item.tipo === 'receita');
-  const despesas = transacoes.filter((item) => item.tipo === 'despesa');
-  const totalReceitas = receitas.reduce((soma, item) => soma + item.valor, 0);
-  const totalDespesas = despesas.reduce((soma, item) => soma + item.valor, 0);
+  const receitas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'receita');
+  const despesas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'despesa');
+  const totalReceitas = receitas.reduce((soma, transacaoAtual) => soma + transacaoAtual.valor, 0);
+  const totalDespesas = despesas.reduce((soma, transacaoAtual) => soma + transacaoAtual.valor, 0);
   const saldo = totalReceitas - totalDespesas;
-  const categorias = calcularCategorias(transacoes);
+  const categorias = calcularGastosPorCategoria(transacoes);
   const dataFormatada = dataGeracao.toLocaleDateString('pt-BR', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
@@ -275,12 +289,12 @@ export function criarHtmlRelatorioPdf({
         .cor-receita, .barra.receita { background: #1A9E75; }
         .cor-despesa, .barra.despesa { background: #E24B4A; }
         .grafico-evolucao { position: relative; height: 205px; padding-left: 74px; break-inside: avoid; page-break-inside: avoid; }
-        .area-escala { position: absolute; left: 0; right: 0; top: 0; height: ${ALTURA_GRAFICO}px; }
+        .area-escala { position: absolute; left: 0; right: 0; top: 0; height: ${ALTURA_GRAFICO_PX}px; }
         .linha-escala { position: absolute; left: 0; right: 0; border-top: 1px solid #E2E8F0; }
         .linha-escala span { position: absolute; width: 66px; left: 0; top: -7px; text-align: right; color: #64748B; font-size: 9px; padding-right: 8px; background: white; }
-        .meses-grafico { height: ${ALTURA_GRAFICO + 25}px; display: flex; position: relative; z-index: 1; }
-        .coluna-mes { flex: 1; height: ${ALTURA_GRAFICO + 25}px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
-        .barras { height: ${ALTURA_GRAFICO}px; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 5px; }
+        .meses-grafico { height: ${ALTURA_GRAFICO_PX + 25}px; display: flex; position: relative; z-index: 1; }
+        .coluna-mes { flex: 1; height: ${ALTURA_GRAFICO_PX + 25}px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+        .barras { height: ${ALTURA_GRAFICO_PX}px; width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 5px; }
         .barra { width: 16px; min-height: 0; border-radius: 4px 4px 0 0; }
         .coluna-mes strong { margin-top: 7px; font-size: 10px; }
         .meta-item { padding: 12px 0; border-bottom: 1px solid #E2E8F0; break-inside: avoid; page-break-inside: avoid; }
@@ -308,8 +322,8 @@ export function criarHtmlRelatorioPdf({
           </div>
           <div class="identificacao">
             <h1>Relatório Financeiro</h1>
-            <p>${escaparHtml(email)}</p>
-            <p>Gerado em ${escaparHtml(dataFormatada)}</p>
+            <p>${escaparTextoHtml(email)}</p>
+            <p>Gerado em ${escaparTextoHtml(dataFormatada)}</p>
           </div>
         </header>
 
@@ -317,9 +331,9 @@ export function criarHtmlRelatorioPdf({
         <section class="secao">
           <h2>Resumo financeiro</h2>
           <div class="cards-resumo">
-            <div class="card-resumo receitas"><span>Receitas</span><strong>${moeda(totalReceitas)}</strong></div>
-            <div class="card-resumo despesas"><span>Despesas</span><strong>${moeda(totalDespesas)}</strong></div>
-            <div class="card-resumo saldo"><span>Saldo atual</span><strong>${moeda(saldo)}</strong></div>
+            <div class="card-resumo receitas"><span>Receitas</span><strong>${formatarValorMonetario(totalReceitas)}</strong></div>
+            <div class="card-resumo despesas"><span>Despesas</span><strong>${formatarValorMonetario(totalDespesas)}</strong></div>
+            <div class="card-resumo saldo"><span>Saldo atual</span><strong>${formatarValorMonetario(saldo)}</strong></div>
           </div>
         </section>
 
@@ -330,7 +344,7 @@ export function criarHtmlRelatorioPdf({
         <section class="secao"><h2>Evolução financeira</h2>${criarGraficoEvolucao(transacoes, dataGeracao)}</section>
         
         <!-- Seção de Metas -->
-        <section class="secao"><h2>Metas em andamento</h2>${criarMetas(metas)}</section>
+        <section class="secao"><h2>Metas em andamento</h2>${criarHtmlMetas(metas)}</section>
 
         <!-- Resumo geral de quantas movimentações foram feitas -->
         <section class="secao">
@@ -348,3 +362,27 @@ export function criarHtmlRelatorioPdf({
     </body>
   </html>`;
 }
+
+/*
+ARQUIVO: relatorioPdf.ts
+
+Responsabilidade:
+Preparar a logo e gerar o HTML do relatório financeiro que será impresso como PDF.
+
+Principais funções:
+- obterLogoRelatorio()
+- criarHtmlRelatorioPdf()
+- calcularGastosPorCategoria()
+- criarGraficoEvolucao()
+- criarHtmlMetas()
+
+Fluxo:
+Dados do relatório -> cálculos e gráficos -> HTML -> impressão/compartilhamento em PDF
+
+Conceitos usados:
+- async/await e Promise
+- Blob e FileReader
+- templates HTML
+- arrays e Map
+- agregação de transações
+*/

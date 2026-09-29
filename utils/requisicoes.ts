@@ -2,13 +2,13 @@ import type { ContextoAnalise, Meta, Notificacao, Transacao } from '../types';
 import { diagnosticarErroJwt, endpointAuth, endpointRest, headersAutenticados, headersPublicos, SUPABASE_URL } from './sessao';
 
 type CabecalhosHttp = Record<string, string>;
-const TEMPO_PADRAO_ESPERA_JWT_EM_MS = 1000;
-const TEMPO_MAXIMO_ESPERA_JWT_EM_MS = 5000;
-const MARGEM_SEGURANCA_ESPERA_JWT_EM_MS = 250;
+const ESPERA_PADRAO_JWT_MS = 1000;
+const ESPERA_MAXIMA_JWT_MS = 5000;
+const MARGEM_ESPERA_JWT_MS = 250;
 
 // Verifica se a mensagem da API indica um JWT emitido no futuro.
 // Recebe o corpo de erro em texto e retorna true somente para esse erro específico.
-function identificarErroJwtEmitidoNoFuturo(corpoErro: string): boolean {
+function detectarErroJwtFuturo(corpoErro: string): boolean {
   // Esse erro aparece quando o relógio do servidor ainda não chegou no horário do token.
   try {
     const detalhesErro = JSON.parse(corpoErro) as { code?: unknown; message?: unknown };
@@ -35,15 +35,15 @@ export async function executarRequisicaoRest(urlConsulta: string, opcoesDaRequis
   if (primeiraResposta.ok) return primeiraResposta;
 
   const corpoErro = await primeiraResposta.clone().text();
-  if (!identificarErroJwtEmitidoNoFuturo(corpoErro)) return primeiraResposta;
+  if (!detectarErroJwtFuturo(corpoErro)) return primeiraResposta;
 
   const cabecalhoAuthorization = new globalThis.Headers(opcoesDaRequisicao.headers).get('Authorization') ?? '';
   const diagnosticoJwt = diagnosticarErroJwt(primeiraResposta, corpoErro, cabecalhoAuthorization);
   const diferencaHorarioServidorEmSegundos = diagnosticoJwt?.iatAdiantadoServidorSegundos;
-  const tempoDeEsperaCalculadoEmMs = diferencaHorarioServidorEmSegundos !== null && diferencaHorarioServidorEmSegundos !== undefined
-    ? Math.max(500, diferencaHorarioServidorEmSegundos * 1000 + MARGEM_SEGURANCA_ESPERA_JWT_EM_MS)
-    : TEMPO_PADRAO_ESPERA_JWT_EM_MS;
-  const tempoDeEsperaEmMs = Math.min(TEMPO_MAXIMO_ESPERA_JWT_EM_MS, tempoDeEsperaCalculadoEmMs);
+  const esperaCalculadaMs = diferencaHorarioServidorEmSegundos !== null && diferencaHorarioServidorEmSegundos !== undefined
+    ? Math.max(500, diferencaHorarioServidorEmSegundos * 1000 + MARGEM_ESPERA_JWT_MS)
+    : ESPERA_PADRAO_JWT_MS;
+  const tempoDeEsperaEmMs = Math.min(ESPERA_MAXIMA_JWT_MS, esperaCalculadaMs);
 
   console.warn(`JWT diagnóstico: nova tentativa REST em ${Math.round(tempoDeEsperaEmMs)} ms.`);
   // Se o JWT foi emitido no futuro segundo o servidor, aguarda e repete a mesma requisição.
