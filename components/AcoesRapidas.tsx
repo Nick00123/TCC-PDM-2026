@@ -59,22 +59,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-/*
-ARQUIVO: AcoesRapidas.tsx
-
-Responsabilidade:
-Exibir atalhos para transações, relatórios e metas.
-
-Principais elementos:
-- AcoesRapidas()
-- acoesRapidas
-
-Fluxo:
-Toque em um atalho -> navegação para a rota correspondente
-
-Conceitos usados:
-- componentes React Native
-- map para renderizar uma lista de ações
-- navegação com Expo Router
-*/

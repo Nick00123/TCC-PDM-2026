@@ -593,26 +593,3 @@ const styles = StyleSheet.create({
   },
   btnSairTexto: { color: '#F44336', fontSize: 15, fontWeight: '600' },
 });
-
-/*
-ARQUIVO: app/(tabs)/perfil.tsx
-
-Responsabilidade:
-Exibir dados do usuário, resumo financeiro, suporte e configurações da conta.
-
-Principais elementos:
-- Perfil()
-- carregarDadosDoPerfil()
-- gerarRelatorioPdf()
-- enviarFeedbackDoUsuario()
-- encerrarSessaoUsuario()
-
-Fluxo:
-Sessão -> resumo e opções do perfil -> ações de PDF, feedback ou logout
-
-Conceitos usados:
-- useState e useFocusEffect
-- Promise.all
-- impressão e compartilhamento de arquivo
-- callbacks assíncronos
-*/

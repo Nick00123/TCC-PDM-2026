@@ -169,23 +169,3 @@ const styles = StyleSheet.create({
   },
   btnCriarTexto: { color: '#1A9E75', fontSize: 17, fontWeight: '800' },
 });
-
-/*
-ARQUIVO: app/intro.tsx
-
-Responsabilidade:
-Apresentar os recursos do EduFinance e encaminhar para autenticação.
-
-Principais elementos:
-- Intro()
-- continuarParaAutenticacao()
-- RECURSOS_APRESENTACAO
-
-Fluxo:
-Toque em entrar/criar -> consulta de sessão -> login ou tela de abas
-
-Conceitos usados:
-- Expo Router
-- async/await
-- map para apresentar recursos
-*/

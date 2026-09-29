@@ -64,23 +64,3 @@ const styles = StyleSheet.create({
   salvar: { padding: 16, borderRadius: 12, alignItems: 'center' },
   salvarTexto: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });
-
-/*
-ARQUIVO: FormularioTransacao.tsx
-
-Responsabilidade:
-Exibir os campos para cadastrar uma receita ou despesa.
-
-Principais elementos:
-- FormularioTransacao()
-- seleção de categoria
-- callbacks de edição e salvamento
-
-Fluxo:
-Props controladas pela tela -> edição dos campos -> callback salvar
-
-Conceitos usados:
-- componentes controlados
-- props e funções de callback
-- renderização condicional
-*/

@@ -53,25 +53,3 @@ export function corDaCategoria(categoria: string, tipo: 'receita' | 'despesa'): 
     default: return '#F1F5F9';
   }
 }
-
-/*
-ARQUIVO: formatacao.ts
-
-Responsabilidade:
-Reunir conversões de valores, datas e cores usadas pelas telas.
-
-Principais funções:
-- formatarMoeda()
-- formatarData()
-- normalizarData()
-- corDaCategoria()
-
-Fluxo:
-Valor ou dado recebido -> função de formatação -> texto ou cor para a interface
-
-Conceitos usados:
-- strings e números
-- expressões regulares
-- arrays
-- union types do TypeScript
-*/

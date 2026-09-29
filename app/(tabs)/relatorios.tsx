@@ -542,25 +542,3 @@ grid: {
   categoriaValor: { fontSize: 12, color: '#64748B', marginTop: 4 },
 
 });
-
-/*
-ARQUIVO: app/(tabs)/relatorios.tsx
-
-Responsabilidade:
-Consultar transações e exibir resumos por período, categoria e tendência.
-
-Principais elementos:
-- Relatorios()
-- separarAnoEMes()
-- preparação de dadosPorMes e dadosGraficoCategorias
-- SeletorMesModal
-
-Fluxo:
-Sessão -> transações -> filtros de ano/mês -> resumos e gráficos
-
-Conceitos usados:
-- useState e useFocusEffect
-- filter, map e reduce
-- componentes Victory
-- seleção de período por modal
-*/

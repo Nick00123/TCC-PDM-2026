@@ -55,22 +55,3 @@ const styles = StyleSheet.create({
   categoria: { fontSize: 12, color: '#888' },
   valor: { fontSize: 16, fontWeight: '700' },
 });
-
-/*
-ARQUIVO: TransacaoItem.tsx
-
-Responsabilidade:
-Mostrar uma transação individual com seu tipo, categoria e valor.
-
-Principais elementos:
-- TransacaoItem()
-- formatação do valor monetário
-
-Fluxo:
-Props da transação -> escolha do ícone/sinal -> apresentação formatada
-
-Conceitos usados:
-- props tipadas
-- renderização condicional
-- estilos dinâmicos
-*/

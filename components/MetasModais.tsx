@@ -51,23 +51,3 @@ const styles = StyleSheet.create({
   cancelar: { padding: 12, alignItems: 'center' },
   cancelarTexto: { color: '#888', fontSize: 15 },
 });
-
-/*
-ARQUIVO: MetasModais.tsx
-
-Responsabilidade:
-Reunir os modais usados para criar uma meta e fazer um depósito.
-
-Principais elementos:
-- ModalNovaMeta()
-- ModalDeposito()
-- props tipadas de cada modal
-
-Fluxo:
-Tela fornece valores e callbacks -> modal exibe campos -> ação volta para a tela
-
-Conceitos usados:
-- componentes controlados
-- props e callbacks
-- componente Modal do React Native
-*/

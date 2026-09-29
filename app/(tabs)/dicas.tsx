@@ -564,25 +564,3 @@ const styles = StyleSheet.create({
   },
   btnEntendiTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
-
-/*
-ARQUIVO: app/(tabs)/dicas.tsx
-
-Responsabilidade:
-Exibir conteúdos educativos e solicitar uma análise financeira personalizada.
-
-Principais elementos:
-- Dicas()
-- buscarDicas()
-- carregarConteudoDaTela()
-- filtro de dicas e contexto enviado à IA
-
-Fluxo:
-Supabase -> dicas e dados financeiros -> análise personalizada -> conteúdo na tela
-
-Conceitos usados:
-- useState, useMemo, useRef e useFocusEffect
-- Promise.all e async/await
-- filtros e listas
-- chamada de Edge Function
-*/

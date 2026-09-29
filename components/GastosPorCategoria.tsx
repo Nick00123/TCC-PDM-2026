@@ -131,24 +131,3 @@ card: {
     marginLeft: 20,
   },
 });
-
-/*
-ARQUIVO: GastosPorCategoria.tsx
-
-Responsabilidade:
-Agrupar despesas por categoria e exibir sua proporção em um gráfico.
-
-Principais elementos:
-- GastosPorCategoria()
-- preparação de dadosGrafico
-- categoriasParaLegenda
-
-Fluxo:
-Transações -> soma por categoria -> porcentagens e cores -> gráfico e legenda
-
-Conceitos usados:
-- filter e forEach
-- Object.entries e Object.values
-- VictoryPie
-- renderização condicional
-*/

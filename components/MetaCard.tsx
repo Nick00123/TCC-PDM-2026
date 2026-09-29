@@ -63,22 +63,3 @@ const styles = StyleSheet.create({
   progressoFill: { backgroundColor: '#1A9E75', height: 8 },
   valores: { fontSize: 12, color: '#888', marginTop: 6 },
 });
-
-/*
-ARQUIVO: MetaCard.tsx
-
-Responsabilidade:
-Exibir os valores e a porcentagem de progresso de uma meta financeira.
-
-Principais elementos:
-- MetaCard()
-- cálculo de percentualConcluido
-
-Fluxo:
-Props da meta -> cálculo da porcentagem -> apresentação dos valores e da barra
-
-Conceitos usados:
-- props tipadas
-- cálculo condicional
-- estilos dinâmicos
-*/

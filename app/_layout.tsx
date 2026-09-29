@@ -25,23 +25,3 @@ export default function RootLayout() {
     </Stack>
   );
 }
-
-/*
-ARQUIVO: app/_layout.tsx
-
-Responsabilidade:
-Configurar a navegação raiz e a tela inicial do aplicativo.
-
-Principais elementos:
-- RootLayout()
-- unstable_settings
-- rotas intro, login, reset e tabs
-
-Fluxo:
-Inicialização -> rota intro -> navegação para autenticação ou abas
-
-Conceitos usados:
-- Expo Router Stack
-- opções de navegação
-- exportação de configuração de rota
-*/

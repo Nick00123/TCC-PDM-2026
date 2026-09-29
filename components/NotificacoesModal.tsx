@@ -321,26 +321,3 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 17, fontWeight: 'bold', color: '#333', marginTop: 12 },
   vazioTexto: { fontSize: 13, color: '#888', textAlign: 'center', marginTop: 8 },
 });
-
-/*
-ARQUIVO: NotificacoesModal.tsx
-
-Responsabilidade:
-Exibir notificações e controlar ações de leitura e exclusão.
-
-Principais elementos:
-- NotificacoesModal()
-- marcarNotificacaoComoLida()
-- marcarTodasComoLidas()
-- confirmarExclusao()
-- formatarTempoDecorrido()
-
-Fluxo:
-Props da tela -> interação no modal -> callback assíncrono -> atualização de estado/feedback
-
-Conceitos usados:
-- useState para indicar operações em andamento
-- async/await e callbacks
-- Alert para confirmação e mensagens
-- FlatList para renderizar notificações
-*/

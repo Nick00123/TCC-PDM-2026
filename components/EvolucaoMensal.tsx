@@ -186,24 +186,3 @@ const styles = StyleSheet.create({
   legendaCor: { width: 10, height: 10, borderRadius: 2 },
   legendaLabel: { fontSize: 12, color: '#888' },
 });
-
-/*
-ARQUIVO: EvolucaoMensal.tsx
-
-Responsabilidade:
-Comparar receitas e despesas por mês e permitir alternar entre semestres.
-
-Principais elementos:
-- EvolucaoMensal()
-- preparação de dadosMensais
-- gráfico Victory
-
-Fluxo:
-Transações -> totais por mês -> seleção do semestre -> gráfico
-
-Conceitos usados:
-- useState
-- filtragem e redução de arrays
-- dimensões responsivas
-- VictoryChart e VictoryBar
-*/

@@ -416,25 +416,3 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
   vazioSubtitulo: { fontSize: 14, color: '#888', textAlign: 'center' },
 });
-
-/*
-ARQUIVO: app/(tabs)/metas.tsx
-
-Responsabilidade:
-Gerenciar metas financeiras e depósitos associados a cada meta.
-
-Principais elementos:
-- Metas()
-- carregarMetas()
-- adicionarMeta() e excluirMeta()
-- depositar() e confirmarDeposito()
-
-Fluxo:
-Sessão do usuário -> operações no Supabase -> atualização de metas e interface
-
-Conceitos usados:
-- useState e useFocusEffect
-- async/await e callbacks
-- validação de valores monetários
-- atualização protegida pelo valor anterior
-*/

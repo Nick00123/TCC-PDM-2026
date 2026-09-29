@@ -102,22 +102,3 @@ const styles = StyleSheet.create({
   },
   badgeTexto: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 });
-
-/*
-ARQUIVO: Cabecalho.tsx
-
-Responsabilidade:
-Mostrar o cabeçalho do aplicativo e o acesso às notificações.
-
-Principais elementos:
-- Cabecalho()
-- NotificacoesModal
-
-Fluxo:
-Props da tela -> cabeçalho e contador -> abertura do modal de notificações
-
-Conceitos usados:
-- props e callbacks tipados
-- useState
-- filtragem de notificações
-*/

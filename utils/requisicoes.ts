@@ -298,28 +298,3 @@ ${JSON.stringify(contexto)}
 
   return corpoDaResposta.resposta.trim();
 }
-
-/*
-ARQUIVO: requisicoes.ts
-
-Responsabilidade:
-Centralizar a comunicação do aplicativo com o Supabase.
-
-Principais funções:
-- buscarTransacoes()
-- criarTransacao()
-- buscarMetas()
-- criarMeta()
-- solicitarAnaliseFinanceiraDaIA()
-
-Fluxo:
-Tela -> requisicoes.ts -> Supabase -> Retorno para Tela
-
-Conceitos usados:
-- async/await
-- fetch
-- REST API
-- JSON
-- Promise
-- TypeScript
-*/

@@ -362,27 +362,3 @@ export function criarHtmlRelatorioPdf({
     </body>
   </html>`;
 }
-
-/*
-ARQUIVO: relatorioPdf.ts
-
-Responsabilidade:
-Preparar a logo e gerar o HTML do relatório financeiro que será impresso como PDF.
-
-Principais funções:
-- obterLogoRelatorio()
-- criarHtmlRelatorioPdf()
-- calcularGastosPorCategoria()
-- criarGraficoEvolucao()
-- criarHtmlMetas()
-
-Fluxo:
-Dados do relatório -> cálculos e gráficos -> HTML -> impressão/compartilhamento em PDF
-
-Conceitos usados:
-- async/await e Promise
-- Blob e FileReader
-- templates HTML
-- arrays e Map
-- agregação de transações
-*/

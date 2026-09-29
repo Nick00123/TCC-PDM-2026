@@ -271,27 +271,3 @@ export function diagnosticarErroJwt(
 
   return { iatAdiantadoServidorSegundos, iatAdiantadoClienteSegundos };
 }
-
-/*
-ARQUIVO: sessao.ts
-
-Responsabilidade:
-Gerenciar a sessão do usuário, os cabeçalhos de acesso e os endpoints do Supabase.
-
-Principais funções:
-- headersPublicos()
-- criarSessao()
-- carregarSessao()
-- obterSessaoValida()
-- headersAutenticados()
-
-Fluxo:
-Autenticação -> armazenamento local -> renovação quando necessário -> requisição autenticada
-
-Conceitos usados:
-- async/await
-- AsyncStorage
-- refresh token
-- Promise compartilhada para evitar renovações simultâneas
-- tipos e respostas do Supabase
-*/

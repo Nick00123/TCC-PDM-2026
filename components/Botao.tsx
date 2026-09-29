@@ -51,23 +51,3 @@ const Botao = (props: BotaoProps) => {
 Botao.displayName = "Botao";
 
 export default Botao;
-
-/*
-ARQUIVO: Botao.tsx
-
-Responsabilidade:
-Fornecer um botão reutilizável com opções de texto, cores e estilos.
-
-Principais elementos:
-- Botao()
-- BotaoProps
-
-Fluxo:
-Props recebidas -> aplicação de valores padrão -> interação pelo onPress
-
-Conceitos usados:
-- props tipadas
-- valores padrão
-- composição de estilos
-- Pressable
-*/

@@ -43,22 +43,3 @@ const styles = StyleSheet.create({
   texto: { fontSize: 13, fontWeight: '600', color: '#3A3A3C' },
   textoAtivo: { color: '#FFFFFF' },
 });
-
-/*
-ARQUIVO: SeletorMesModal.tsx
-
-Responsabilidade:
-Permitir selecionar um mês em uma janela modal.
-
-Principais elementos:
-- SeletorMesModal()
-- callback selecionar()
-
-Fluxo:
-Lista de meses recebida -> toque no mês -> índice enviado à tela
-
-Conceitos usados:
-- props tipadas
-- map para montar a grade
-- callback de seleção
-*/

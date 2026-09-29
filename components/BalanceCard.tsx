@@ -93,22 +93,3 @@ caixinhaTextos: { flexDirection: 'column', flexShrink: 1 },
     flexShrink: 1,
   },
 });
-
-/*
-ARQUIVO: BalanceCard.tsx
-
-Responsabilidade:
-Mostrar o saldo total e separar visualmente receitas e despesas.
-
-Principais elementos:
-- BalanceCard()
-- Props: saldo, receitas e despesas
-
-Fluxo:
-Valores recebidos da tela -> formatação monetária -> exibição do resumo
-
-Conceitos usados:
-- props tipadas
-- componentes e estilos React Native
-- função utilitária de formatação
-*/

@@ -202,24 +202,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-/*
-ARQUIVO: app/(tabs)/index.tsx
-
-Responsabilidade:
-Carregar e apresentar o resumo financeiro da tela inicial.
-
-Principais elementos:
-- Home()
-- carregarResumoInicio()
-- cálculo do saldo e notificações derivadas
-
-Fluxo:
-Sessão do usuário -> consultas de transações/metas -> resumo e componentes da home
-
-Conceitos usados:
-- useState e useFocusEffect
-- Promise.all
-- filter, map e reduce
-- callbacks de notificação
-*/

@@ -124,24 +124,3 @@ const styles = StyleSheet.create({
   botao: { backgroundColor: '#1A9E75', borderRadius: 12, padding: 15, alignItems: 'center' },
   botaoTexto: { color: '#fff', fontWeight: '700' },
 });
-
-/*
-ARQUIVO: app/reset.tsx
-
-Responsabilidade:
-Validar o link de recuperação e atualizar a senha da conta.
-
-Principais elementos:
-- RedefinirSenha()
-- obterPrimeiroParametro()
-- atualizarTokenDoLink()
-- atualizarSenha()
-
-Fluxo:
-Link de recuperação -> token access_token -> envio da nova senha -> retorno ao login
-
-Conceitos usados:
-- Expo Router e deep links
-- useEffect e estado controlado
-- fetch e endpoint de autenticação
-*/

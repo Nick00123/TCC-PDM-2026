@@ -3,23 +3,23 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 import { useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import Botao from '../components/Botao';
 import { enviarAutenticacao, salvarOuAtualizarPerfilUsuario } from '../utils/requisicoes';
 import {
-    criarSessao,
-    headersAutenticados,
-    salvarSessao,
+  criarSessao,
+  headersAutenticados,
+  salvarSessao,
 } from '../utils/sessao';
 
 // Converte mensagens técnicas da autenticação em textos compreensíveis para a pessoa.
@@ -431,25 +431,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-
-/*
-ARQUIVO: app/login.tsx
-
-Responsabilidade:
-Permitir entrar, criar uma conta e solicitar o link de redefinição de senha.
-
-Principais elementos:
-- Login()
-- confirmarAutenticacao()
-- formatarMensagemDeErro()
-- criação/armazenamento da sessão
-
-Fluxo:
-Formulário -> autenticação Supabase -> sessão/perfil -> área de abas
-
-Conceitos usados:
-- estado controlado com useState
-- async/await
-- tratamento de erros
-- payloads JSON e sessão tipada
-*/

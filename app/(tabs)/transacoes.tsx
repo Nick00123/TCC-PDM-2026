@@ -454,25 +454,3 @@ const styles = StyleSheet.create({
   itemValor: { fontSize: 15, fontWeight: 'bold', marginRight: 12 },
   btnLixeira: { padding: 4 },
 });
-
-/*
-ARQUIVO: app/(tabs)/transacoes.tsx
-
-Responsabilidade:
-Consultar, filtrar, agrupar, criar e excluir transações do usuário.
-
-Principais elementos:
-- Transacoes()
-- carregarTransacoes()
-- salvarTransacao()
-- agrupar transações por data
-
-Fluxo:
-Sessão -> consulta REST -> filtro/busca -> operações e atualização da lista
-
-Conceitos usados:
-- useState e useFocusEffect
-- validação de data e valor
-- filter, reduce e agrupamento por data
-- callbacks assíncronos
-*/
