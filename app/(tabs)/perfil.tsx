@@ -34,6 +34,8 @@ const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
   { chave: 'elogio', icone: Star, label: 'Elogio' },
 ];
 
+// Exibe os dados da conta, resumo financeiro, suporte e ações do perfil.
+// Carrega dados da sessão e executa ações de feedback, PDF e encerramento.
 export default function Perfil() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [totalReceitas, setTotalReceitas] = useState(0);
@@ -49,34 +51,35 @@ export default function Perfil() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
   const router = useRouter();
 
-  const carregarPerfil = useCallback(async () => {
+  // Busca o usuário autenticado e soma suas receitas e despesas.
+  const carregarDadosDoPerfil = useCallback(async () => {
     // Busco os dados do usuário e o resumo financeiro para esta tela.
     setCarregandoTransacoes(true);
     try {
-      const dadosUsuario = await obterUsuarioDaSessao();
-      if (!dadosUsuario) {
+      const usuarioDaSessao = await obterUsuarioDaSessao();
+      if (!usuarioDaSessao) {
         router.replace('/login');
         return;
       }
       setUsuario({
-        id: dadosUsuario.id,
-        nome: dadosUsuario.user_metadata?.nome || dadosUsuario.email?.split('@')[0] || '',
-        email: dadosUsuario.email || '',
+        id: usuarioDaSessao.id,
+        nome: usuarioDaSessao.user_metadata?.nome || usuarioDaSessao.email?.split('@')[0] || '',
+        email: usuarioDaSessao.email || '',
       });
-      const lista = await buscarResumoFinanceiroUsuario(dadosUsuario.id, await headersAutenticados());
+      const transacoesDoResumo = await buscarResumoFinanceiroUsuario(usuarioDaSessao.id, await headersAutenticados());
       setTotalReceitas(
-        lista
-          .filter((item: any) => item.tipo === 'receita')
-          .reduce((total: number, item: any) => total + Number(item.valor), 0)
+        transacoesDoResumo
+          .filter((transacaoAtual: any) => transacaoAtual.tipo === 'receita')
+          .reduce((somaValores: number, transacaoAtual: any) => somaValores + Number(transacaoAtual.valor), 0)
       );
       setTotalDespesas(
-        lista
-          .filter((item: any) => item.tipo === 'despesa')
-          .reduce((total: number, item: any) => total + Number(item.valor), 0)
+        transacoesDoResumo
+          .filter((transacaoAtual: any) => transacaoAtual.tipo === 'despesa')
+          .reduce((somaValores: number, transacaoAtual: any) => somaValores + Number(transacaoAtual.valor), 0)
       );
       setErroTransacoes(null);
-    } catch (error) {
-      console.error(error);
+    } catch (detalhesErro) {
+      console.error(detalhesErro);
       setErroTransacoes('Resumo indisponível');
     } finally {
       setCarregandoTransacoes(false);
@@ -85,11 +88,12 @@ export default function Perfil() {
 
   useFocusEffect(
     useCallback(() => {
-      void carregarPerfil();
-    }, [carregarPerfil])
+      void carregarDadosDoPerfil();
+    }, [carregarDadosDoPerfil])
   );
 
-  async function logout() {
+  // Avisa o Supabase que a sessão terminou e depois remove os dados locais.
+  async function encerrarSessaoUsuario() {
     // Primeiro aviso o servidor e depois apago a sessão salva no celular.
     const sessao = await carregarSessao();
     try {
@@ -104,37 +108,38 @@ export default function Perfil() {
     }
   }
 
-  async function gerarPDF() {
+  // Gera o relatório financeiro e disponibiliza o arquivo para compartilhamento.
+  async function gerarRelatorioPdf() {
     if (!usuario || gerandoPdf) return;
 
     setGerandoPdf(true);
     try {
       // O PDF usa os mesmos dados que aparecem nas outras telas do app.
-      const headers = await headersAutenticados();
-      const [transacoes, metas, logoDataUrl] = await Promise.all([
-        buscarTransacoes(usuario.id, headers),
-        buscarMetas(usuario.id, headers),
+      const cabecalhosAutenticados = await headersAutenticados();
+      const [transacoesRecebidas, metasRecebidas, logoDataUrl] = await Promise.all([
+        buscarTransacoes(usuario.id, cabecalhosAutenticados),
+        buscarMetas(usuario.id, cabecalhosAutenticados),
         obterLogoRelatorio(),
       ]);
-      const html = criarHtmlRelatorioPdf({
+      const htmlRelatorio = criarHtmlRelatorioPdf({
         email: usuario.email,
-        transacoes,
-        metas,
+        transacoes: transacoesRecebidas,
+        metas: metasRecebidas,
         logoDataUrl,
       });
-      const arquivo = await Print.printToFileAsync({ html, base64: true });
-      if (!arquivo.base64) {
+      const arquivoPdf = await Print.printToFileAsync({ html: htmlRelatorio, base64: true });
+      if (!arquivoPdf.base64) {
         throw new Error('O PDF foi gerado sem conteúdo para compartilhamento.');
       }
 
       // A URI temporária do expo-print pode não ser legível pelo expo-sharing
       // no Expo Go/Android. Este arquivo fica no cache autorizado do aplicativo.
-      const pdfCompartilhavel = new File(
+      const arquivoPdfCompartilhavel = new File(
         Paths.cache,
         `relatorio-edufinance-${Date.now()}.pdf`
       );
-      pdfCompartilhavel.create({ overwrite: true });
-      pdfCompartilhavel.write(arquivo.base64, { encoding: 'base64' });
+      arquivoPdfCompartilhavel.create({ overwrite: true });
+      arquivoPdfCompartilhavel.write(arquivoPdf.base64, { encoding: 'base64' });
 
       try {
         await criarNotificacao(
@@ -146,33 +151,34 @@ export default function Perfil() {
             lida: false,
             chave_evento: `relatorio_gerado:${Date.now()}`,
           },
-          headers
+          cabecalhosAutenticados
         );
-      } catch (error) {
-        console.error('Erro ao registrar notificação do relatório:', error);
+      } catch (detalhesErro) {
+        console.error('Erro ao registrar notificação do relatório:', detalhesErro);
       }
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(pdfCompartilhavel.uri, {
+        await Sharing.shareAsync(arquivoPdfCompartilhavel.uri, {
           mimeType: 'application/pdf',
           dialogTitle: 'Compartilhar relatório EduFinance',
         });
       } else {
-        Alert.alert('Relatório gerado', `O arquivo foi salvo em ${pdfCompartilhavel.uri}`);
+        Alert.alert('Relatório gerado', `O arquivo foi salvo em ${arquivoPdfCompartilhavel.uri}`);
       }
-    } catch (error) {
-      console.error('Erro ao gerar relatório:', error);
+    } catch (detalhesErro) {
+      console.error('Erro ao gerar relatório:', detalhesErro);
       Alert.alert('Erro', 'Não foi possível gerar o relatório agora.');
     } finally {
       setGerandoPdf(false);
     }
   }
 
-  const enviarFeedback = async () => {
+  // Valida e envia a mensagem de feedback associada ao usuário autenticado.
+  const enviarFeedbackDoUsuario = async () => {
     // Não envio mensagem vazia nem deixo clicar duas vezes durante o envio.
     if (enviandoFeedback) return;
-    const texto = feedback.trim();
-    if (!texto) {
+    const mensagemFeedback = feedback.trim();
+    if (!mensagemFeedback) {
       Alert.alert('Atenção', 'Escreva sua mensagem antes de enviar.');
       return;
     }
@@ -188,7 +194,7 @@ export default function Perfil() {
 
       await enviarFeedbackAoBanco(
         usuarioSessao.id,
-        texto,
+        mensagemFeedback,
         categoriaFeedback,
         await headersAutenticados()
       );
@@ -197,8 +203,8 @@ export default function Perfil() {
       setFeedbackEnviado(true);
       setTimeout(() => setFeedbackEnviado(false), 4000);
       Alert.alert('Sucesso', 'Feedback enviado! Obrigado pela contribuição.');
-    } catch (error) {
-      console.error('Erro inesperado ao enviar feedback:', error);
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao enviar feedback:', detalhesErro);
       Alert.alert('Ops', 'Não foi possível enviar. Tente novamente.');
     } finally {
       setEnviandoFeedback(false);
@@ -206,7 +212,7 @@ export default function Perfil() {
   };
 
   // Escolho as cores da tela conforme o tema marcado.
-  const theme = temaEscuro
+  const coresTema = temaEscuro
     ? {
         container: { backgroundColor: '#0F172A' },
         sectionBg: '#1E293B',
@@ -225,7 +231,7 @@ export default function Perfil() {
       };
 
   return (
-    <ScrollView style={[styles.container, theme.container]}>
+    <ScrollView style={[styles.container, coresTema.container]}>
       {/* Card do usuário */}
       <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' }]}>
         <View style={styles.avatar}>
@@ -240,7 +246,7 @@ export default function Perfil() {
       </View>
 
       {/* Resumo financeiro */}
-      <View style={[styles.resumo, { backgroundColor: theme.card }]}>
+      <View style={[styles.resumo, { backgroundColor: coresTema.card }]}>
         {carregandoTransacoes || erroTransacoes ? (
           <Text style={styles.resumoEstado}>
             {carregandoTransacoes ? 'Carregando resumo...' : 'Resumo indisponível'}
@@ -249,26 +255,26 @@ export default function Perfil() {
           <>
             <View style={styles.resumoItem}>
               <Text style={[styles.resumoValor, { color: '#1A9E75' }]}>R$ {totalReceitas.toFixed(2)}</Text>
-              <Text style={[styles.resumoLabel, { color: theme.subText }]}>Receitas</Text>
+              <Text style={[styles.resumoLabel, { color: coresTema.subText }]}>Receitas</Text>
             </View>
             <View style={styles.divisor} />
             <View style={styles.resumoItem}>
               <Text style={[styles.resumoValor, { color: '#F44336' }]}>R$ {totalDespesas.toFixed(2)}</Text>
-              <Text style={[styles.resumoLabel, { color: theme.subText }]}>Despesas</Text>
+              <Text style={[styles.resumoLabel, { color: coresTema.subText }]}>Despesas</Text>
             </View>
           </>
         )}
       </View>
 
       {/* Configurações */}
-      <Text style={[styles.secaoTitulo, { color: theme.subText }]}>CONFIGURAÇÕES</Text>
-      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}>
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+      <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>CONFIGURAÇÕES</Text>
+      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
+        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <View style={styles.itemEsquerda}>
             <Target size={20} color="#1A9E75" />
             <View>
-              <Text style={[styles.itemTitulo, { color: theme.text }]}>Aparência / Tema</Text>
-              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>Alternar entre Modo Claro e Modo Escuro</Text>
+              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Aparência / Tema</Text>
+              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Alternar entre Modo Claro e Modo Escuro</Text>
             </View>
           </View>
           <Switch
@@ -279,15 +285,15 @@ export default function Perfil() {
         </View>
 
         <TouchableOpacity
-          style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}
-          onPress={gerarPDF}
+          style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}
+          onPress={gerarRelatorioPdf}
           disabled={gerandoPdf || carregandoTransacoes || !usuario}
         >
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
             <View>
-              <Text style={[styles.itemTitulo, { color: theme.text }]}>Relatório em PDF</Text>
-              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>
+              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Relatório em PDF</Text>
+              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>
                 {gerandoPdf ? 'Gerando relatório...' : 'Gerar e compartilhar seu resumo financeiro'}
               </Text>
             </View>
@@ -295,40 +301,40 @@ export default function Perfil() {
           <ChevronRight size={18} color="#ccc" />
         </TouchableOpacity>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
             <View>
-              <Text style={[styles.itemTitulo, { color: theme.text }]}>Termos de Uso e Política de Privacidade</Text>
-              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>Leia nossos termos e políticas</Text>
+              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Termos de Uso e Política de Privacidade</Text>
+              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Leia nossos termos e políticas</Text>
             </View>
           </View>
           <ChevronRight size={18} color="#ccc" />
         </View>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <View style={styles.itemEsquerda}>
             <Shield size={20} color="#1A9E75" />
             <View>
-              <Text style={[styles.itemTitulo, { color: theme.text }]}>Backup na Nuvem</Text>
-              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>Status da última sincronização dos dados</Text>
+              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Backup na Nuvem</Text>
+              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Status da última sincronização dos dados</Text>
             </View>
           </View>
         </View>
       </View>
 
       {/* Ajuda e suporte */}
-      <Text style={[styles.secaoTitulo, { color: theme.subText }]}>AJUDA E SUPORTE</Text>
-      <View style={[styles.secao, { backgroundColor: theme.sectionBg, borderColor: theme.border }]}>
-        <View style={[styles.faqCard, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-          <Text style={[styles.itemTitulo, { color: theme.text }]}>Perguntas Frequentes (FAQ)</Text>
-          <Text style={[styles.faqText, { color: theme.subText }]}>• Como adicionar uma nova receita/despesa?</Text>
-          <Text style={[styles.faqText, { color: theme.subText }]}>• Os meus dados financeiros estão seguros?</Text>
-          <Text style={[styles.faqText, { color: theme.subText }]}>• Como funcionam os relatórios mensais?</Text>
-          <Text style={[styles.faqText, { color: theme.subText }]}>• Como redefinir minha senha?</Text>
+      <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>AJUDA E SUPORTE</Text>
+      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
+        <View style={[styles.faqCard, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
+          <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Perguntas Frequentes (FAQ)</Text>
+          <Text style={[styles.faqText, { color: coresTema.subText }]}>• Como adicionar uma nova receita/despesa?</Text>
+          <Text style={[styles.faqText, { color: coresTema.subText }]}>• Os meus dados financeiros estão seguros?</Text>
+          <Text style={[styles.faqText, { color: coresTema.subText }]}>• Como funcionam os relatórios mensais?</Text>
+          <Text style={[styles.faqText, { color: coresTema.subText }]}>• Como redefinir minha senha?</Text>
         </View>
 
-        <Text style={[styles.itemTitulo, { marginHorizontal: 16, marginTop: 16, color: theme.text }]}>Canais de Contato</Text>
+        <Text style={[styles.itemTitulo, { marginHorizontal: 16, marginTop: 16, color: coresTema.text }]}>Canais de Contato</Text>
         <TouchableOpacity
           style={styles.contactButton}
           onPress={() => {
@@ -361,9 +367,9 @@ export default function Perfil() {
           <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
 
-        <View style={[styles.feedbackBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Text style={[styles.itemTitulo, { color: theme.text }]}>Feedback / Enviar Sugestão</Text>
-          <Text style={[styles.feedbackSubtitulo, { color: theme.subText }]}>
+        <View style={[styles.feedbackBox, { backgroundColor: coresTema.card, borderColor: coresTema.border }]}>
+          <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Feedback / Enviar Sugestão</Text>
+          <Text style={[styles.feedbackSubtitulo, { color: coresTema.subText }]}>
             Sua mensagem vai direto para os desenvolvedores do app.
           </Text>
 
@@ -389,7 +395,7 @@ export default function Perfil() {
           </View>
 
           <TextInput
-            style={[styles.feedbackInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.sectionBg }]}
+            style={[styles.feedbackInput, { color: coresTema.text, borderColor: coresTema.border, backgroundColor: coresTema.sectionBg }]}
             placeholder="Escreva sua ideia de melhoria"
             placeholderTextColor="#999"
             value={feedback}
@@ -403,7 +409,7 @@ export default function Perfil() {
 
           <TouchableOpacity
             style={[styles.btnEnviarFeedback, { backgroundColor: '#1A9E75' }]}
-            onPress={enviarFeedback}
+            onPress={enviarFeedbackDoUsuario}
             disabled={enviandoFeedback}
           >
             <Send size={16} color="#fff" />
@@ -413,12 +419,12 @@ export default function Perfil() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.itemConfig, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <View style={styles.itemEsquerda}>
             <HelpCircle size={20} color="#1A9E75" />
             <View>
-              <Text style={[styles.itemTitulo, { color: theme.text }]}>Reportar um Problema (Bug)</Text>
-              <Text style={[styles.itemSubtitulo, { color: theme.subText }]}>Avisar se algo travou ou não está funcionando</Text>
+              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Reportar um Problema (Bug)</Text>
+              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Avisar se algo travou ou não está funcionando</Text>
             </View>
           </View>
           <ChevronRight size={18} color="#ccc" />
@@ -426,8 +432,8 @@ export default function Perfil() {
       </View>
 
       {/* Rodapé */}
-      <Text style={[styles.versao, { color: theme.text }]}>⭐ EduFinance v1.0</Text>
-      <Text style={[styles.subVersao, { color: theme.subText }]}>Feito para jovens que querem organizar as finanças</Text>
+      <Text style={[styles.versao, { color: coresTema.text }]}>⭐ EduFinance v1.0</Text>
+      <Text style={[styles.subVersao, { color: coresTema.subText }]}>Feito para jovens que querem organizar as finanças</Text>
 
       <TouchableOpacity
         style={styles.btnSair}
@@ -436,7 +442,7 @@ export default function Perfil() {
           if (saindo) return;
           setSaindo(true);
           try {
-            await logout();
+            await encerrarSessaoUsuario();
             router.replace('/login');
           } catch (e) {
             console.error('Erro ao sair:', e);
@@ -587,3 +593,26 @@ const styles = StyleSheet.create({
   },
   btnSairTexto: { color: '#F44336', fontSize: 15, fontWeight: '600' },
 });
+
+/*
+ARQUIVO: app/(tabs)/perfil.tsx
+
+Responsabilidade:
+Exibir dados do usuário, resumo financeiro, suporte e configurações da conta.
+
+Principais elementos:
+- Perfil()
+- carregarDadosDoPerfil()
+- gerarRelatorioPdf()
+- enviarFeedbackDoUsuario()
+- encerrarSessaoUsuario()
+
+Fluxo:
+Sessão -> resumo e opções do perfil -> ações de PDF, feedback ou logout
+
+Conceitos usados:
+- useState e useFocusEffect
+- Promise.all
+- impressão e compartilhamento de arquivo
+- callbacks assíncronos
+*/

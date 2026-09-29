@@ -18,6 +18,8 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 const LIMITE_METAS = 5;
 const LIMITE_TRANSACOES = 5;
 
+// Reúne o resumo financeiro, metas, notificações e transações recentes.
+// Carrega dados da sessão atual e apresenta os componentes da tela inicial.
 export default function Home() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
@@ -26,45 +28,45 @@ export default function Home() {
   const [carregandoNotificacoes, setCarregandoNotificacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
   const [erroNotificacoes, setErroNotificacoes] = useState<string | null>(null);
-  const carregarDados = useCallback(async () => {
+  const carregarResumoInicio = useCallback(async () => {
     // A home busca tudo que precisa para montar o resumo de uma vez.
     setCarregandoTransacoes(true);
     setCarregandoNotificacoes(true);
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) { router.replace('/login'); return; }
-      const headers = await headersAutenticados();
-      const [listaTransacoes, listaMetas] = await Promise.all([
-        buscarTransacoes(usuario.id, headers),
-        buscarMetas(usuario.id, headers),
+      const cabecalhosAutenticados = await headersAutenticados();
+      const [transacoesRecebidas, metasRecebidas] = await Promise.all([
+        buscarTransacoes(usuario.id, cabecalhosAutenticados),
+        buscarMetas(usuario.id, cabecalhosAutenticados),
       ]);
-      setTransacoes(listaTransacoes);
-      setMetas(listaMetas);
+      setTransacoes(transacoesRecebidas);
+      setMetas(metasRecebidas);
       setErroTransacoes(null);
 
       try {
         // Essas notificações são criadas só quando acontece uma situação importante.
-        const notificacoesPendentes = listaMetas
-          .filter((meta) => meta.atual >= meta.total)
-          .map((meta) => criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${meta.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${meta.id}` }, headers));
+        const notificacoesPendentes = metasRecebidas
+          .filter((metaAtual) => metaAtual.atual >= metaAtual.total)
+          .map((metaAtual) => criarNotificacao({ usuario_id: usuario.id, titulo: 'Meta concluída!', mensagem: `Parabéns! Você alcançou a meta "${metaAtual.titulo}".`, tipo: 'meta', lida: false, chave_evento: `meta_concluida:${metaAtual.id}` }, cabecalhosAutenticados));
 
-        const receitas = listaTransacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
-        const despesas = listaTransacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+        const receitas = transacoesRecebidas.filter((transacaoAtual) => transacaoAtual.tipo === 'receita').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
+        const despesas = transacoesRecebidas.filter((transacaoAtual) => transacaoAtual.tipo === 'despesa').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
         if (despesas > receitas) {
           const hojeLocal = new Date();
           const dataAtual = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, '0')}-${String(hojeLocal.getDate()).padStart(2, '0')}`;
-          notificacoesPendentes.push(criarNotificacao({ usuario_id: usuario.id, titulo: 'Atenção ao saldo', mensagem: 'Suas despesas estão maiores que suas receitas.', tipo: 'alerta', lida: false, chave_evento: `saldo_negativo:${dataAtual}` }, headers));
+          notificacoesPendentes.push(criarNotificacao({ usuario_id: usuario.id, titulo: 'Atenção ao saldo', mensagem: 'Suas despesas estão maiores que suas receitas.', tipo: 'alerta', lida: false, chave_evento: `saldo_negativo:${dataAtual}` }, cabecalhosAutenticados));
         }
 
         await Promise.all(notificacoesPendentes);
-        setNotificacoes(await buscarNotificacoes(usuario.id, headers));
+        setNotificacoes(await buscarNotificacoes(usuario.id, cabecalhosAutenticados));
         setErroNotificacoes(null);
-      } catch (error) {
-        console.error('Erro ao carregar notificações:', error);
+      } catch (detalhesErro) {
+        console.error('Erro ao carregar notificações:', detalhesErro);
         setErroNotificacoes('Não foi possível carregar as notificações.');
       }
-    } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
+    } catch (detalhesErro) {
+      console.error('Erro ao carregar dashboard:', detalhesErro);
       setErroTransacoes('Não foi possível carregar o resumo.');
     } finally {
       setCarregandoTransacoes(false);
@@ -74,33 +76,34 @@ export default function Home() {
 
   useFocusEffect(
     useCallback(() => {
-      void carregarDados();
-    }, [carregarDados])
+      void carregarResumoInicio();
+    }, [carregarResumoInicio])
   );
 
-  async function alterarNotificacao(caminho: string, metodo: 'PATCH' | 'DELETE') {
+  // Acrescenta o usuário à consulta e recarrega a home após a alteração.
+  async function alterarNotificacaoDoUsuario(urlConsulta: string, metodoHttp: 'PATCH' | 'DELETE') {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    const separador = caminho.includes('?') ? '&' : '?';
+    const separadorConsulta = urlConsulta.includes('?') ? '&' : '?';
     await alterarNotificacoes(
-      `${caminho}${separador}usuario_id=eq.${encodeURIComponent(usuario.id)}`,
-      metodo,
+      `${urlConsulta}${separadorConsulta}usuario_id=eq.${encodeURIComponent(usuario.id)}`,
+      metodoHttp,
       await headersAutenticados()
     );
-    await carregarDados();
+    await carregarResumoInicio();
     return { sucesso: true, mensagem: '' };
   }
 
-  async function marcarLida(id: string) { return alterarNotificacao(`notificacoes?id=eq.${encodeURIComponent(id)}`, 'PATCH'); }
-  async function marcarTodasLidas() { return alterarNotificacao('notificacoes?lida=eq.false', 'PATCH'); }
-  async function excluirNotificacao(id: string) { return alterarNotificacao(`notificacoes?id=eq.${encodeURIComponent(id)}`, 'DELETE'); }
+  async function marcarLida(notificacaoId: string) { return alterarNotificacaoDoUsuario(`notificacoes?id=eq.${encodeURIComponent(notificacaoId)}`, 'PATCH'); }
+  async function marcarTodasLidas() { return alterarNotificacaoDoUsuario('notificacoes?lida=eq.false', 'PATCH'); }
+  async function excluirNotificacao(notificacaoId: string) { return alterarNotificacaoDoUsuario(`notificacoes?id=eq.${encodeURIComponent(notificacaoId)}`, 'DELETE'); }
 
-  const totalReceitas = transacoes.filter((item) => item.tipo === 'receita').reduce((total, item) => total + item.valor, 0);
-  const totalDespesas = transacoes.filter((item) => item.tipo === 'despesa').reduce((total, item) => total + item.valor, 0);
+  const totalReceitas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'receita').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
+  const totalDespesas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'despesa').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
   // O saldo é tudo que entrou menos tudo que saiu.
   const saldoTotal = totalReceitas - totalDespesas;
 
-  const metasEmAndamento = metas.filter((meta: Meta) => meta.atual < meta.total);
+  const metasEmAndamento = metas.filter((metaAtual: Meta) => metaAtual.atual < metaAtual.total);
   const metasVisiveis = metasEmAndamento.slice(0, LIMITE_METAS);
   const transacoesVisiveis = transacoes.slice(0, LIMITE_TRANSACOES);
 
@@ -119,8 +122,8 @@ export default function Home() {
       {/* Mostro só as metas abertas e deixo um botão para ver o restante. */}
       {metasEmAndamento.length > 0 && (
         <>
-          {metasVisiveis.map((meta: Meta) => (
-            <MetaCard key={meta.id} {...meta} />
+          {metasVisiveis.map((metaAtual: Meta) => (
+            <MetaCard key={metaAtual.id} {...metaAtual} />
           ))}
           {metasEmAndamento.length > LIMITE_METAS && (
             <TouchableOpacity
@@ -139,8 +142,8 @@ export default function Home() {
 
       {!carregandoTransacoes && !erroTransacoes && transacoes.length > 0 && (
         <>
-          {transacoesVisiveis.map((t: Transacao) => (
-            <TransacaoItem key={t.id} {...t} />
+          {transacoesVisiveis.map((transacaoAtual: Transacao) => (
+            <TransacaoItem key={transacaoAtual.id} {...transacaoAtual} />
           ))}
           {transacoes.length > LIMITE_TRANSACOES && (
             <TouchableOpacity
@@ -199,3 +202,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+/*
+ARQUIVO: app/(tabs)/index.tsx
+
+Responsabilidade:
+Carregar e apresentar o resumo financeiro da tela inicial.
+
+Principais elementos:
+- Home()
+- carregarResumoInicio()
+- cálculo do saldo e notificações derivadas
+
+Fluxo:
+Sessão do usuário -> consultas de transações/metas -> resumo e componentes da home
+
+Conceitos usados:
+- useState e useFocusEffect
+- Promise.all
+- filter, map e reduce
+- callbacks de notificação
+*/

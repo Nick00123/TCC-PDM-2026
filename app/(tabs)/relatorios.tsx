@@ -29,21 +29,22 @@ import type { AbaRelatorio, Transacao } from '../../types';
 import { buscarTransacoes } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
-const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const COR_RECEITA = '#1a9e75';
 const COR_DESPESA = '#e24b4a';
-const CORES_CATEG = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
+const CORES_CATEGORIAS = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 
-const formatarEixoY = (valor: number) => {
+const formatarValorEixoY = (valor: number) => {
   // Deixo os valores do eixo menores para não ocupar tanto espaço.
   if (valor === 0) return 'R$0';
   if (Math.abs(valor) >= 1000) return `R$${(valor / 1000).toFixed(0)}k`;
   return `R$${Math.round(valor)}`;
 };
 
-const obterAnoMes = (data: string) => {
+// Divide uma data ISO em ano e índice do mês para os filtros do relatório.
+const separarAnoEMes = (dataTexto: string) => {
   // Transformo a data em números que facilitam os filtros do relatório.
-  const [ano, mes] = data.split('-').map(Number);
+  const [ano, mes] = dataTexto.split('-').map(Number);
   return { ano, mes: mes - 1 };
 };
 
@@ -62,6 +63,8 @@ const estiloEixoY = {
   tickLabels: { fill: '#8E8E93', fontSize: 10, padding: 4 },
 };
 
+// Carrega transações e prepara os resumos e gráficos do período selecionado.
+// Mantém o estado de navegação, período, carregamento e erro desta tela.
 export default function Relatorios() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
@@ -73,10 +76,10 @@ export default function Relatorios() {
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) throw new Error('Usuário não autenticado.');
-      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
-      setTransacoes(lista);
+      const transacoesRecebidas = await buscarTransacoes(usuario.id, await headersAutenticados());
+      setTransacoes(transacoesRecebidas);
       setErroTransacoes(null);
-    } catch (error) { console.error(error); setErroTransacoes('Não foi possível carregar as transações.'); }
+    } catch (detalhesErro) { console.error(detalhesErro); setErroTransacoes('Não foi possível carregar as transações.'); }
     finally { setCarregandoTransacoes(false); }
   }, []);
 
@@ -85,37 +88,37 @@ export default function Relatorios() {
       void carregarTransacoes();
     }, [carregarTransacoes])
   );
-  const [aba, setAba] = useState<AbaRelatorio>('geral');
+  const [abaSelecionada, setAbaSelecionada] = useState<AbaRelatorio>('geral');
   const [semestre, setSemestre] = useState<1 | 2>(1);
   const [mesSelecionado, setMesSelecionado] = useState<number>(new Date().getMonth());
   const anoSelecionado = new Date().getFullYear();
   
   // Estado para controlar o Modal Customizado do Calendário
-  const [modalVisible, setModalVisible] = useState(false);
+  const [seletorMesVisivel, setSeletorMesVisivel] = useState(false);
 
   const { width } = useWindowDimensions();
   // Ajuste do padding do container para evitar corte nas bordas do celular
   const larguraGrafico = width - 70;
 
   // Primeiro filtro pelo ano atual e depois pelo mês escolhido.
-  const transacoesDoAno = transacoes.filter((t: Transacao) => {
-    const { ano } = obterAnoMes(t.data);
+  const transacoesDoAno = transacoes.filter((transacaoAtual: Transacao) => {
+    const { ano } = separarAnoEMes(transacaoAtual.data);
     return ano === anoSelecionado;
   });
 
-  const transacoesFiltradas = transacoesDoAno.filter((t: Transacao) => {
-    const { mes } = obterAnoMes(t.data);
+  const transacoesFiltradas = transacoesDoAno.filter((transacaoAtual: Transacao) => {
+    const { mes } = separarAnoEMes(transacaoAtual.data);
     return mes === mesSelecionado;
   });
 
   // Os cards de resumo mostram apenas o mês selecionado.
   const totalReceitas = transacoesFiltradas
-    .filter((t: Transacao) => t.tipo === 'receita')
-    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'receita')
+    .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
   const totalDespesas = transacoesFiltradas
-    .filter((t: Transacao) => t.tipo === 'despesa')
-    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'despesa')
+    .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
   const economizado = totalReceitas - totalDespesas;
   const taxaPoupanca = totalReceitas > 0
@@ -123,34 +126,34 @@ export default function Relatorios() {
     : '0.0';
 
   // Esses dados alimentam os gráficos de evolução e tendência.
-  const dadosMeses = MESES.map((label, i) => {
+  const dadosPorMes = NOMES_MESES.map((nomeMes, indiceMes) => {
     const receita = transacoesDoAno
-      .filter((t: Transacao) => t.tipo === 'receita' && obterAnoMes(t.data).mes === i)
-      .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+      .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'receita' && separarAnoEMes(transacaoAtual.data).mes === indiceMes)
+      .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
     const despesa = transacoesDoAno
-      .filter((t: Transacao) => t.tipo === 'despesa' && obterAnoMes(t.data).mes === i)
-      .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
-    return { x: i + 1, mes: label, receita, despesa, economia: receita - despesa };
+      .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'despesa' && separarAnoEMes(transacaoAtual.data).mes === indiceMes)
+      .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
+    return { x: indiceMes + 1, mes: nomeMes, receita, despesa, economia: receita - despesa };
   });
 
   const dadosSemestre = semestre === 1
-    ? dadosMeses.slice(0, 6)
-    : dadosMeses.slice(6, 12).map((d, i) => ({ ...d, x: i + 1 }));
+    ? dadosPorMes.slice(0, 6)
+    : dadosPorMes.slice(6, 12).map((dadosDoMes, indiceMes) => ({ ...dadosDoMes, x: indiceMes + 1 }));
 
-  const maxValor = Math.max(...dadosSemestre.map((d) => Math.max(d.receita, d.despesa)), 100);
-  const maxEcon = Math.max(...dadosMeses.map((d) => Math.abs(d.economia)), 100);
+  const valorMaximoGrafico = Math.max(...dadosSemestre.map((dadosDoMes) => Math.max(dadosDoMes.receita, dadosDoMes.despesa)), 100);
+  const variacaoMaximaEconomia = Math.max(...dadosPorMes.map((dadosDoMes) => Math.abs(dadosDoMes.economia)), 100);
 
-  const categMap: { [key: string]: number } = {};
+  const despesasPorCategoria: { [key: string]: number } = {};
   transacoesFiltradas
-    .filter((t: Transacao) => t.tipo === 'despesa')
-    .forEach((t: Transacao) => {
-      categMap[t.categoria] = (categMap[t.categoria] || 0) + t.valor;
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'despesa')
+    .forEach((transacaoAtual: Transacao) => {
+      despesasPorCategoria[transacaoAtual.categoria] = (despesasPorCategoria[transacaoAtual.categoria] || 0) + transacaoAtual.valor;
     });
-  const dadosPie = Object.entries(categMap).map(([nome, valor]) => ({
-    x: nome,
-    y: valor,
+  const dadosGraficoCategorias = Object.entries(despesasPorCategoria).map(([nomeCategoria, valorCategoria]) => ({
+    x: nomeCategoria,
+    y: valorCategoria,
   }));
-  const temCateg = dadosPie.length > 0;
+  const temDadosCategorias = dadosGraficoCategorias.length > 0;
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -163,10 +166,10 @@ export default function Relatorios() {
 
         <TouchableOpacity 
           style={styles.badgeMes} 
-          onPress={() => setModalVisible(true)} 
+          onPress={() => setSeletorMesVisivel(true)}
           activeOpacity={0.7}
         >
-          <Text style={styles.badgeMesTexto}>{`${MESES[mesSelecionado]} de ${anoSelecionado}`}</Text>
+          <Text style={styles.badgeMesTexto}>{`${NOMES_MESES[mesSelecionado]} de ${anoSelecionado}`}</Text>
           <CalendarIcon size={14} color="#666" style={{ marginLeft: 6 }} />
         </TouchableOpacity>
       </View>
@@ -226,20 +229,20 @@ export default function Relatorios() {
             ['categorias', 'Categorias'],
             ['tendencias', 'Tendências'],
           ] as [AbaRelatorio, string][]
-          ).map(([key, label]) => (
+          ).map(([identificadorAba, tituloAba]) => (
           <TouchableOpacity
-            key={key}
-            style={[styles.aba, aba === key && styles.abaAtiva]}
-            onPress={() => setAba(key)}
+            key={identificadorAba}
+            style={[styles.aba, abaSelecionada === identificadorAba && styles.abaAtiva]}
+            onPress={() => setAbaSelecionada(identificadorAba)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.abaTexto, aba === key && styles.abaTextoAtivo]}>{label}</Text>
+            <Text style={[styles.abaTexto, abaSelecionada === identificadorAba && styles.abaTextoAtivo]}>{tituloAba}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       {/* ── VISÃO GERAL ── */}
-      {aba === 'geral' && (
+      {abaSelecionada === 'geral' && (
         <View style={styles.graficoCard}>
           <Text style={styles.graficoTitulo}>Receitas vs. Despesas (6 meses)</Text>
 
@@ -273,7 +276,7 @@ export default function Relatorios() {
             width={larguraGrafico}
             height={220}
             theme={VictoryTheme.material}
-            domain={{ y: [0, maxValor] }}
+            domain={{ y: [0, valorMaximoGrafico] }}
             padding={{ top: 10, bottom: 30, left: 45, right: 15 }}
           >
             <VictoryAxis
@@ -281,7 +284,7 @@ export default function Relatorios() {
               tickFormat={(x) => dadosSemestre[x - 1]?.mes || ''}
               style={estiloEixoX}
             />
-            <VictoryAxis dependentAxis tickFormat={formatarEixoY} style={estiloEixoY} />
+            <VictoryAxis dependentAxis tickFormat={formatarValorEixoY} style={estiloEixoY} />
               <VictoryArea
               data={dadosSemestre}
               x="x"
@@ -319,31 +322,31 @@ export default function Relatorios() {
       )}
 
       {/* ── CATEGORIAS ── */}
-      {aba === 'categorias' && (
+      {abaSelecionada === 'categorias' && (
         <View style={styles.graficoCard}>
           <Text style={styles.graficoTitulo}>Despesas por Categoria</Text>
           <Text style={styles.graficoTitulo}>O gráfico mostra apenas despesas do mês selecionado</Text>
 
-          {temCateg ? (
+          {temDadosCategorias ? (
             <View style={styles.donutCenter}>
               <VictoryPie
-                data={dadosPie}
+                data={dadosGraficoCategorias}
                 width={larguraGrafico}
                 height={200}
-                colorScale={CORES_CATEG}
+                colorScale={CORES_CATEGORIAS}
                 innerRadius={60}
                 labels={() => ''}
                 padding={15}
               />
 
               <View style={styles.categoriasCards}>
-                {dadosPie.map((d, i) => (
-                  <View key={d.x} style={styles.categoriaCard}>
-                    <View style={[styles.categoriaDot, { backgroundColor: CORES_CATEG[i % CORES_CATEG.length] }]} />
+                {dadosGraficoCategorias.map((dadosCategoria, indiceCategoria) => (
+                  <View key={dadosCategoria.x} style={styles.categoriaCard}>
+                    <View style={[styles.categoriaDot, { backgroundColor: CORES_CATEGORIAS[indiceCategoria % CORES_CATEGORIAS.length] }]} />
                     <View style={styles.categoriaInfo}>
-                      <Text style={styles.categoriaNome}>{d.x}</Text>
+                      <Text style={styles.categoriaNome}>{dadosCategoria.x}</Text>
                       <Text style={styles.categoriaValor}>
-                        R$ {d.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {totalDespesas > 0 ? ((d.y / totalDespesas) * 100).toFixed(1) : '0.0'}%
+                        R$ {dadosCategoria.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {totalDespesas > 0 ? ((dadosCategoria.y / totalDespesas) * 100).toFixed(1) : '0.0'}%
                       </Text>
                     </View>
                   </View>
@@ -370,7 +373,7 @@ export default function Relatorios() {
       )}
 
       {/* ── TENDÊNCIAS ── */}
-      {aba === 'tendencias' && (
+      {abaSelecionada === 'tendencias' && (
         <View style={styles.graficoCard}>
           <Text style={styles.graficoTitulo}>Economia Mensal</Text>
 
@@ -378,17 +381,17 @@ export default function Relatorios() {
             width={larguraGrafico}
             height={220}
             theme={VictoryTheme.material}
-            domain={{ y: [-maxEcon, maxEcon] }}
+            domain={{ y: [-variacaoMaximaEconomia, variacaoMaximaEconomia] }}
             padding={{ top: 10, bottom: 30, left: 45, right: 15 }}
           >
             <VictoryAxis
-              tickValues={dadosMeses.map((d) => d.x)}
-              tickFormat={MESES}
+              tickValues={dadosPorMes.map((dadosDoMes) => dadosDoMes.x)}
+              tickFormat={NOMES_MESES}
               style={estiloEixoX}
             />
-            <VictoryAxis dependentAxis tickFormat={formatarEixoY} style={estiloEixoY} />
+            <VictoryAxis dependentAxis tickFormat={formatarValorEixoY} style={estiloEixoY} />
             <VictoryLine
-              data={dadosMeses}
+              data={dadosPorMes}
               x="x"
               y="economia"
               style={{ data: { stroke: COR_RECEITA, strokeWidth: 2.5 } }}
@@ -399,7 +402,7 @@ export default function Relatorios() {
         </>
       )}
 
-      <SeletorMesModal visivel={modalVisible} meses={MESES} mesSelecionado={mesSelecionado} fechar={() => setModalVisible(false)} selecionar={(indice) => { setMesSelecionado(indice); setModalVisible(false); }} />
+      <SeletorMesModal visivel={seletorMesVisivel} meses={NOMES_MESES} mesSelecionado={mesSelecionado} fechar={() => setSeletorMesVisivel(false)} selecionar={(indice) => { setMesSelecionado(indice); setSeletorMesVisivel(false); }} />
     </ScrollView>
   );
 }
@@ -539,3 +542,25 @@ grid: {
   categoriaValor: { fontSize: 12, color: '#64748B', marginTop: 4 },
 
 });
+
+/*
+ARQUIVO: app/(tabs)/relatorios.tsx
+
+Responsabilidade:
+Consultar transações e exibir resumos por período, categoria e tendência.
+
+Principais elementos:
+- Relatorios()
+- separarAnoEMes()
+- preparação de dadosPorMes e dadosGraficoCategorias
+- SeletorMesModal
+
+Fluxo:
+Sessão -> transações -> filtros de ano/mês -> resumos e gráficos
+
+Conceitos usados:
+- useState e useFocusEffect
+- filter, map e reduce
+- componentes Victory
+- seleção de período por modal
+*/

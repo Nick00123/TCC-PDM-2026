@@ -11,14 +11,16 @@ import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
 
-function dataValida(data: string) {
+// Confere se uma data ISO existe no calendário, incluindo meses com durações diferentes.
+// Recebe a data em formato texto; retorna true quando seus componentes formam uma data real.
+function validarDataIso(dataTexto: string): boolean {
   // Essa validação evita datas impossíveis, como 31 de fevereiro.
-  const partes = /^(\d{4})-(\d{2})-(\d{2})$/.exec(data);
-  if (!partes) return false;
+  const partesData = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataTexto);
+  if (!partesData) return false;
 
-  const ano = Number(partes[1]);
-  const mes = Number(partes[2]);
-  const dia = Number(partes[3]);
+  const ano = Number(partesData[1]);
+  const mes = Number(partesData[2]);
+  const dia = Number(partesData[3]);
   const dataCriada = new Date(ano, mes - 1, dia);
 
   return dataCriada.getFullYear() === ano
@@ -26,25 +28,29 @@ function dataValida(data: string) {
     && dataCriada.getDate() === dia;
 }
 
-function dataLocalHoje() {
-  const agora = new Date();
-  return `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}-${String(agora.getDate()).padStart(2, '0')}`;
+// Cria a data local de hoje no formato ISO usado pelo formulário.
+// Não recebe argumentos; retorna uma string no formato AAAA-MM-DD.
+function obterDataLocalAtual(): string {
+  const dataAtual = new Date();
+  return `${dataAtual.getFullYear()}-${String(dataAtual.getMonth() + 1).padStart(2, '0')}-${String(dataAtual.getDate()).padStart(2, '0')}`;
 }
 
+// Carrega, filtra, agrupa e permite gerenciar as transações do usuário.
+// Os dados persistidos e as regras de validação são mantidos pelas operações existentes.
 export default function Transacoes() {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const [filtro, setFiltro] = useState<FiltroTransacao>('todos');
-  const [busca, setBusca] = useState('');
-  const [modalTipo, setModalTipo] = useState<TipoModalTransacao>(null);
+  const [filtroTransacoes, setFiltroTransacoes] = useState<FiltroTransacao>('todos');
+  const [termoBusca, setTermoBusca] = useState('');
+  const [tipoModalTransacao, setTipoModalTransacao] = useState<TipoModalTransacao>(null);
 
-  const [valor, setValor] = useState('');
+  const [valorTransacao, setValorTransacao] = useState('');
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
-  const [data, setData] = useState(dataLocalHoje());
+  const [dataTransacao, setDataTransacao] = useState(obterDataLocalAtual());
   const [salvando, setSalvando] = useState(false);
-  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [excluindoTransacaoId, setExcluindoTransacaoId] = useState<string | null>(null);
 
   const carregarTransacoes = useCallback(async () => {
     // A lista é recarregada quando a aba volta a ficar visível.
@@ -52,11 +58,11 @@ export default function Transacoes() {
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) throw new Error('Usuário não autenticado.');
-      const lista = await buscarTransacoes(usuario.id, await headersAutenticados());
-      setTransacoes(lista);
+      const transacoesRecebidas = await buscarTransacoes(usuario.id, await headersAutenticados());
+      setTransacoes(transacoesRecebidas);
       setErroTransacoes(null);
-    } catch (error) {
-      console.error('Erro ao carregar transações:', error);
+    } catch (detalhesErro) {
+      console.error('Erro ao carregar transações:', detalhesErro);
       setErroTransacoes('Não foi possível carregar as transações.');
     } finally {
       setCarregandoTransacoes(false);
@@ -69,125 +75,131 @@ export default function Transacoes() {
     }, [carregarTransacoes])
   );
 
-  async function adicionarTransacao(nova: Omit<Transacao, 'id'>) {
+  // Cria uma transação e atualiza a lista exibida após a resposta do banco.
+  async function adicionarTransacao(novaTransacao: Omit<Transacao, 'id'>) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    await criarTransacao(usuario.id, nova, await headersAutenticados());
+    await criarTransacao(usuario.id, novaTransacao, await headersAutenticados());
     await carregarTransacoes();
     return { sucesso: true, mensagem: '' };
   }
 
-  async function removerTransacao(id: string) {
+  // Exclui a transação indicada e recarrega as transações do usuário.
+  async function removerTransacao(transacaoId: string) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    await excluirTransacao(usuario.id, id, await headersAutenticados());
+    await excluirTransacao(usuario.id, transacaoId, await headersAutenticados());
     await carregarTransacoes();
     return { sucesso: true, mensagem: '' };
   }
 
   // Primeiro aplico o filtro escolhido e depois a busca pelo texto.
   const transacoesFiltradas = transacoes
-    .filter((t: Transacao) => {
-      if (filtro === 'receitas') return t.tipo === 'receita';
-      if (filtro === 'despesas') return t.tipo === 'despesa';
+    .filter((transacaoAtual: Transacao) => {
+      if (filtroTransacoes === 'receitas') return transacaoAtual.tipo === 'receita';
+      if (filtroTransacoes === 'despesas') return transacaoAtual.tipo === 'despesa';
       return true;
     })
-    .filter((t: Transacao) =>
-      t.descricao.toLowerCase().includes(busca.toLowerCase())
+    .filter((transacaoAtual: Transacao) =>
+      transacaoAtual.descricao.toLowerCase().includes(termoBusca.toLowerCase())
     );
 
   // Esse saldo muda conforme o filtro e a busca atuais.
-  const saldoFiltrado = transacoesFiltradas.reduce((acc: number, t: { tipo: string; valor: number; }) => {
-    return t.tipo === 'receita' ? acc + t.valor : acc - t.valor;
+  const saldoFiltrado = transacoesFiltradas.reduce((saldoAcumulado: number, transacaoAtual: Transacao) => {
+    return transacaoAtual.tipo === 'receita'
+      ? saldoAcumulado + transacaoAtual.valor
+      : saldoAcumulado - transacaoAtual.valor;
   }, 0);
 
   const totalReceitasFiltradas = transacoesFiltradas
-    .filter((t: Transacao) => t.tipo === 'receita')
-    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'receita')
+    .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
   const totalDespesasFiltradas = transacoesFiltradas
-    .filter((t: Transacao) => t.tipo === 'despesa')
-    .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'despesa')
+    .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
-  const headerTitle = filtro === 'receitas' ? 'Receitas' : filtro === 'despesas' ? 'Despesas' : 'Transações';
-  const headerValue = filtro === 'receitas'
+  const tituloResumo = filtroTransacoes === 'receitas' ? 'Receitas' : filtroTransacoes === 'despesas' ? 'Despesas' : 'Transações';
+  const valorResumo = filtroTransacoes === 'receitas'
     ? totalReceitasFiltradas
-    : filtro === 'despesas'
+    : filtroTransacoes === 'despesas'
     ? totalDespesasFiltradas
     : saldoFiltrado;
-  const headerColor = filtro === 'receitas' ? '#0D9488' : filtro === 'despesas' ? '#E11D48' : (saldoFiltrado >= 0 ? '#0D9488' : '#E11D48');
-  const headerDisplay = filtro === 'despesas'
-    ? `-R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-    : filtro === 'receitas'
-    ? `+R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-    : headerValue >= 0
-    ? `+R$ ${headerValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-    : `-R$ ${Math.abs(headerValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const corResumo = filtroTransacoes === 'receitas' ? '#0D9488' : filtroTransacoes === 'despesas' ? '#E11D48' : (saldoFiltrado >= 0 ? '#0D9488' : '#E11D48');
+  const valorResumoFormatado = filtroTransacoes === 'despesas'
+    ? `-R$ ${valorResumo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : filtroTransacoes === 'receitas'
+    ? `+R$ ${valorResumo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : valorResumo >= 0
+    ? `+R$ ${valorResumo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    : `-R$ ${Math.abs(valorResumo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
-  const grupos: { [data: string]: { itens: Transacao[]; totalDia: number } } = {};
+  const gruposPorData: { [data: string]: { itens: Transacao[]; totalDia: number } } = {};
   
-  transacoesFiltradas.forEach((t: Transacao) => {
-    if (!grupos[t.data]) {
-      grupos[t.data] = { itens: [], totalDia: 0 };
+  transacoesFiltradas.forEach((transacaoAtual: Transacao) => {
+    if (!gruposPorData[transacaoAtual.data]) {
+      gruposPorData[transacaoAtual.data] = { itens: [], totalDia: 0 };
     }
-    grupos[t.data].itens.push(t);
-    grupos[t.data].totalDia += t.tipo === 'receita' ? t.valor : -t.valor;
+    gruposPorData[transacaoAtual.data].itens.push(transacaoAtual);
+    gruposPorData[transacaoAtual.data].totalDia += transacaoAtual.tipo === 'receita' ? transacaoAtual.valor : -transacaoAtual.valor;
   });
 
-  const limparForm = () => {
-    setValor('');
+  const limparFormularioTransacao = () => {
+    setValorTransacao('');
     setDescricao('');
     setCategoria('');
-    setData(dataLocalHoje());
-    setModalTipo(null);
+    setDataTransacao(obterDataLocalAtual());
+    setTipoModalTransacao(null);
   };
 
-  const salvar = async () => {
+  // Valida e converte os campos antes de criar a transação.
+  const salvarTransacao = async () => {
     // Converto o valor brasileiro para número antes de salvar.
-    if (salvando || !modalTipo) return;
+    if (salvando || !tipoModalTransacao) return;
 
     if (!descricao.trim() || !categoria) {
       Alert.alert('Campos obrigatórios', 'Preencha a descrição e escolha uma categoria.');
       return;
     }
 
-    const valorNumerico = Number(valor.trim().replace(',', '.'));
-    if (!valor.trim() || !Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+    const valorNumerico = Number(valorTransacao.trim().replace(',', '.'));
+    if (!valorTransacao.trim() || !Number.isFinite(valorNumerico) || valorNumerico <= 0) {
       Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
       return;
     }
 
-    const dataFormatada = normalizarData(data);
-    if (!dataValida(dataFormatada)) {
+    const dataFormatada = normalizarData(dataTransacao);
+    if (!validarDataIso(dataFormatada)) {
       Alert.alert('Data inválida', 'Informe uma data válida no formato AAAA-MM-DD, DD/MM/AAAA ou DD-MM-AAAA.');
       return;
     }
 
     setSalvando(true);
     try {
-      const resultado = await adicionarTransacao({
+      const resultadoOperacao = await adicionarTransacao({
         descricao: descricao.trim(),
         categoria,
         valor: valorNumerico,
         data: dataFormatada,
-        tipo: modalTipo,
+        tipo: tipoModalTransacao,
       });
 
-      if (!resultado.sucesso) {
-        Alert.alert('Erro ao adicionar', resultado.mensagem);
+      if (!resultadoOperacao.sucesso) {
+        Alert.alert('Erro ao adicionar', resultadoOperacao.mensagem);
         return;
       }
 
-      limparForm();
-    } catch (error) {
-      console.error('Erro inesperado ao adicionar transação:', error);
+      limparFormularioTransacao();
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao adicionar transação:', detalhesErro);
       Alert.alert('Erro ao adicionar', 'Não foi possível adicionar a transação. Tente novamente.');
     } finally {
       setSalvando(false);
     }
   };
 
-  const confirmarExclusao = (id: string) => {
+  // Pede confirmação antes de remover uma transação do banco.
+  const confirmarExclusao = (transacaoId: string) => {
     Alert.alert(
       'Excluir transação',
       'Deseja realmente excluir esta transação?',
@@ -197,17 +209,17 @@ export default function Transacoes() {
           text: 'Excluir',
           style: 'destructive',
           onPress: async () => {
-            setExcluindoId(id);
+            setExcluindoTransacaoId(transacaoId);
             try {
-              const resultado = await removerTransacao(id);
-              if (!resultado.sucesso) {
-                Alert.alert('Erro ao excluir', resultado.mensagem);
+              const resultadoOperacao = await removerTransacao(transacaoId);
+              if (!resultadoOperacao.sucesso) {
+                Alert.alert('Erro ao excluir', resultadoOperacao.mensagem);
               }
-            } catch (error) {
-              console.error('Erro inesperado ao excluir transação:', error);
+            } catch (detalhesErro) {
+              console.error('Erro inesperado ao excluir transação:', detalhesErro);
               Alert.alert('Erro ao excluir', 'Não foi possível excluir a transação. Tente novamente.');
             } finally {
-              setExcluindoId(null);
+              setExcluindoTransacaoId(null);
             }
           },
         },
@@ -216,32 +228,32 @@ export default function Transacoes() {
   };
 
   // A lista de categorias muda conforme o tipo escolhido.
-  const categorias = modalTipo === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
+  const categoriasDisponiveis = tipoModalTransacao === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
 
   return (
     <View style={styles.container}>
       {/* Cabeçalho */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.titulo}>{headerTitle}</Text>
+          <Text style={styles.titulo}>{tituloResumo}</Text>
           <Text style={styles.saldoFiltrado}>
             {carregandoTransacoes ? (
               'Carregando...'
             ) : erroTransacoes ? (
               'Valores indisponíveis'
             ) : (
-              <Text style={{ color: headerColor, fontWeight: 'bold' }}>{headerDisplay}</Text>
+              <Text style={{ color: corResumo, fontWeight: 'bold' }}>{valorResumoFormatado}</Text>
             )}
           </Text>
         </View>
 
         <View style={styles.headerBotoes}>
-          <TouchableOpacity style={styles.btnReceita} onPress={() => setModalTipo('receita')}>
+          <TouchableOpacity style={styles.btnReceita} onPress={() => setTipoModalTransacao('receita')}>
             <Plus size={14} color="#fff" />
             <Text style={styles.btnTextoReceita}>Receita</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.btnDespesa} onPress={() => setModalTipo('despesa')}>
+          <TouchableOpacity style={styles.btnDespesa} onPress={() => setTipoModalTransacao('despesa')}>
             <Plus size={14} color="#E11D48" />
             <Text style={styles.btnTextoDespesa}>Despesa</Text>
           </TouchableOpacity>
@@ -253,22 +265,22 @@ export default function Transacoes() {
         <TextInput
           style={styles.busca}
           placeholder="Buscar..."
-          value={busca}
-          onChangeText={setBusca}
+          value={termoBusca}
+          onChangeText={setTermoBusca}
         />
       </View>
 
       {/* Filtros */}
       <View style={styles.filtrosRow}>
         <View style={styles.filtros}>
-          {(['todos', 'receitas', 'despesas'] as FiltroTransacao[]).map(f => (
+          {(['todos', 'receitas', 'despesas'] as FiltroTransacao[]).map((filtroAtual) => (
             <TouchableOpacity
-              key={f}
-              style={[styles.filtroBotao, filtro === f && styles.filtroAtivo]}
-              onPress={() => setFiltro(f)}
+              key={filtroAtual}
+              style={[styles.filtroBotao, filtroTransacoes === filtroAtual && styles.filtroAtivo]}
+              onPress={() => setFiltroTransacoes(filtroAtual)}
             >
-              <Text style={[styles.filtroTexto, filtro === f && styles.filtroTextoAtivo]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
+              <Text style={[styles.filtroTexto, filtroTransacoes === filtroAtual && styles.filtroTextoAtivo]}>
+                {filtroAtual.charAt(0).toUpperCase() + filtroAtual.slice(1)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -290,37 +302,37 @@ export default function Transacoes() {
           <Text style={styles.estadoLista}>Nenhuma transação cadastrada.</Text>
         ) : transacoesFiltradas.length === 0 ? (
           <Text style={styles.estadoLista}>Nenhuma transação encontrada.</Text>
-        ) : Object.entries(grupos).map(([dataKey, grupo]) => (
+        ) : Object.entries(gruposPorData).map(([dataKey, grupoDoDia]) => (
           <View key={dataKey}>
             <View style={styles.dataHeader}>
               <Text style={styles.dataLabel}>{formatarData(dataKey)}</Text>
-              <Text style={[styles.dataTotal, { color: grupo.totalDia >= 0 ? '#0D9488' : '#E11D48' }]}> 
-                  {grupo.totalDia >= 0
-                    ? `+R$ ${grupo.totalDia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                    : `-R$ ${Math.abs(grupo.totalDia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+              <Text style={[styles.dataTotal, { color: grupoDoDia.totalDia >= 0 ? '#0D9488' : '#E11D48' }]}>
+                  {grupoDoDia.totalDia >= 0
+                    ? `+R$ ${grupoDoDia.totalDia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                    : `-R$ ${Math.abs(grupoDoDia.totalDia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                 </Text>
             </View>
 
-{grupo.itens.map((t: Transacao) => (
-              <View key={t.id} style={styles.item}>
-<View style={[styles.iconeWrap, { backgroundColor: corDaCategoria(t.categoria, t.tipo) }]}>
-                  {t.tipo === 'receita'
+{grupoDoDia.itens.map((transacaoAtual: Transacao) => (
+              <View key={transacaoAtual.id} style={styles.item}>
+<View style={[styles.iconeWrap, { backgroundColor: corDaCategoria(transacaoAtual.categoria, transacaoAtual.tipo) }]}>
+                  {transacaoAtual.tipo === 'receita'
                     ? <ArrowUpRight size={20} color="#0D9488" />
                     : <ArrowDownRight size={20} color="#E11D48" />}
                 </View>
                 
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemDesc}>{t.descricao}</Text>
-                  <Text style={styles.itemCat}>{t.categoria}</Text>
+                  <Text style={styles.itemDesc}>{transacaoAtual.descricao}</Text>
+                  <Text style={styles.itemCat}>{transacaoAtual.categoria}</Text>
                 </View>
 
-                <Text style={[styles.itemValor, { color: t.tipo === 'receita' ? '#0D9488' : '#E11D48' }]}>
-                  {t.tipo === 'receita' ? '+' : '-'}R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                <Text style={[styles.itemValor, { color: transacaoAtual.tipo === 'receita' ? '#0D9488' : '#E11D48' }]}>
+                  {transacaoAtual.tipo === 'receita' ? '+' : '-'}R$ {transacaoAtual.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </Text>
 
                 <TouchableOpacity 
-                  onPress={() => confirmarExclusao(t.id)}
-                  disabled={excluindoId === t.id}
+                  onPress={() => confirmarExclusao(transacaoAtual.id)}
+                  disabled={excluindoTransacaoId === transacaoAtual.id}
                   style={styles.btnLixeira}
                 >
                   <Trash2 size={16} color="#94A3B8" />
@@ -331,7 +343,7 @@ export default function Transacoes() {
         ))}
       </ScrollView>
 
-      <FormularioTransacao tipo={modalTipo} valor={valor} descricao={descricao} categoria={categoria} categorias={categorias} salvando={salvando} setValor={setValor} setDescricao={setDescricao} setCategoria={setCategoria} fechar={limparForm} salvar={salvar} />
+      <FormularioTransacao tipo={tipoModalTransacao} valor={valorTransacao} descricao={descricao} categoria={categoria} categorias={categoriasDisponiveis} salvando={salvando} setValor={setValorTransacao} setDescricao={setDescricao} setCategoria={setCategoria} fechar={limparFormularioTransacao} salvar={salvarTransacao} />
 
     </View>
   );
@@ -442,3 +454,25 @@ const styles = StyleSheet.create({
   itemValor: { fontSize: 15, fontWeight: 'bold', marginRight: 12 },
   btnLixeira: { padding: 4 },
 });
+
+/*
+ARQUIVO: app/(tabs)/transacoes.tsx
+
+Responsabilidade:
+Consultar, filtrar, agrupar, criar e excluir transações do usuário.
+
+Principais elementos:
+- Transacoes()
+- carregarTransacoes()
+- salvarTransacao()
+- agrupar transações por data
+
+Fluxo:
+Sessão -> consulta REST -> filtro/busca -> operações e atualização da lista
+
+Conceitos usados:
+- useState e useFocusEffect
+- validação de data e valor
+- filter, reduce e agrupamento por data
+- callbacks assíncronos
+*/

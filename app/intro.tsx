@@ -4,7 +4,7 @@ import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { obterSessaoValida } from '../utils/sessao';
 
 // Lista usada para montar os cartões de apresentação sem repetir código.
-const RECURSOS = [
+const RECURSOS_APRESENTACAO = [
   {
     icone: <Wallet size={22} color="#1A9E75" />,
     titulo: 'Controle Financeiro',
@@ -27,18 +27,20 @@ const RECURSOS = [
   },
 ];
 
+// Apresenta o aplicativo e direciona a pessoa para entrar ou criar uma conta.
+// Não recebe props nem retorna dados; consulta a sessão antes de navegar.
 export default function Intro() {
   const router = useRouter();
 
-  const irPara = async (aba: 'entrar' | 'criar') => {
+  const continuarParaAutenticacao = async (modoAutenticacao: 'entrar' | 'criar') => {
     // Se a pessoa já entrou antes, ela não precisa ver o login de novo.
-    const sessao = await obterSessaoValida();
-    if (sessao) {
+    const sessaoAtiva = await obterSessaoValida();
+    if (sessaoAtiva) {
       router.replace('/(tabs)');
       return;
     }
 
-    router.replace({ pathname: '/login', params: { aba } });
+    router.replace({ pathname: '/login', params: { aba: modoAutenticacao } });
   };
 
   return (
@@ -60,12 +62,12 @@ export default function Intro() {
       {/* Recursos */}
       <View style={styles.cards}>
         {/* Os recursos são mostrados a partir da lista acima. */}
-        {RECURSOS.map((r) => (
-          <View key={r.titulo} style={styles.card}>
-            <View style={styles.cardIcone}>{r.icone}</View>
+        {RECURSOS_APRESENTACAO.map((recursoAtual) => (
+          <View key={recursoAtual.titulo} style={styles.card}>
+            <View style={styles.cardIcone}>{recursoAtual.icone}</View>
             <View style={styles.cardInfo}>
-              <Text style={styles.cardTitulo}>{r.titulo}</Text>
-              <Text style={styles.cardDescricao}>{r.descricao}</Text>
+              <Text style={styles.cardTitulo}>{recursoAtual.titulo}</Text>
+              <Text style={styles.cardDescricao}>{recursoAtual.descricao}</Text>
             </View>
           </View>
         ))}
@@ -78,11 +80,11 @@ export default function Intro() {
           Comece a transformar sua relação com o dinheiro hoje!
         </Text>
 
-        <TouchableOpacity style={styles.btnEntrar} onPress={() => irPara('entrar')} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.btnEntrar} onPress={() => continuarParaAutenticacao('entrar')} activeOpacity={0.8}>
           <Text style={styles.btnEntrarTexto}>Entrar</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.btnCriar} onPress={() => irPara('criar')} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.btnCriar} onPress={() => continuarParaAutenticacao('criar')} activeOpacity={0.8}>
           <PiggyBank size={18} color="#1A9E75" />
           <Text style={styles.btnCriarTexto}>Criar minha conta</Text>
         </TouchableOpacity>
@@ -167,3 +169,23 @@ const styles = StyleSheet.create({
   },
   btnCriarTexto: { color: '#1A9E75', fontSize: 17, fontWeight: '800' },
 });
+
+/*
+ARQUIVO: app/intro.tsx
+
+Responsabilidade:
+Apresentar os recursos do EduFinance e encaminhar para autenticação.
+
+Principais elementos:
+- Intro()
+- continuarParaAutenticacao()
+- RECURSOS_APRESENTACAO
+
+Fluxo:
+Toque em entrar/criar -> consulta de sessão -> login ou tela de abas
+
+Conceitos usados:
+- Expo Router
+- async/await
+- map para apresentar recursos
+*/

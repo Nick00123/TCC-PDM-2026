@@ -1,5 +1,4 @@
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react-native';
-import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { formatarMoeda } from '../utils/formatacao';
 

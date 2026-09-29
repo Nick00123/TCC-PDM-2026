@@ -1,6 +1,5 @@
 import { router } from 'expo-router';
 import { ArrowDownLeft, ArrowUpRight, BarChart2, Target } from 'lucide-react-native';
-import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const acoesRapidas = [

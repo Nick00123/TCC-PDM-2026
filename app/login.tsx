@@ -22,70 +22,75 @@ import {
     salvarSessao,
 } from '../utils/sessao';
 
-function mensagemDeErro(erro: any): string {
+// Converte mensagens técnicas da autenticação em textos compreensíveis para a pessoa.
+// Recebe o corpo de erro da API; retorna uma mensagem pronta para Alert.
+function formatarMensagemDeErro(detalhesErroRecebidos: any): string {
   // Transformo os erros técnicos da API em mensagens mais fáceis de entender.
-  const mensagem = erro?.msg || erro?.error_description || erro?.message || erro?.error || '';
-  const texto = `${erro?.code || ''} ${mensagem}`.toLowerCase();
+  const mensagemRecebida = detalhesErroRecebidos?.msg || detalhesErroRecebidos?.error_description || detalhesErroRecebidos?.message || detalhesErroRecebidos?.error || '';
+  const textoDoErro = `${detalhesErroRecebidos?.code || ''} ${mensagemRecebida}`.toLowerCase();
 
-  if (texto.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
-  if (texto.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
-  if (texto.includes('already registered') || texto.includes('user_already_exists')) {
+  if (textoDoErro.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (textoDoErro.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (textoDoErro.includes('already registered') || textoDoErro.includes('user_already_exists')) {
     return 'Este e-mail já está cadastrado.';
   }
-  if (texto.includes('at least 6 characters')) return 'A senha deve ter pelo menos 6 caracteres.';
-  if (texto.includes('rate limit')) return 'Muitas tentativas. Aguarde e tente novamente.';
-  if (texto.includes('weak_password')) return 'A senha é muito fraca.';
+  if (textoDoErro.includes('at least 6 characters')) return 'A senha deve ter pelo menos 6 caracteres.';
+  if (textoDoErro.includes('rate limit')) return 'Muitas tentativas. Aguarde e tente novamente.';
+  if (textoDoErro.includes('weak_password')) return 'A senha é muito fraca.';
 
-  return mensagem || 'Não foi possível concluir a operação. Tente novamente.';
+  return mensagemRecebida || 'Não foi possível concluir a operação. Tente novamente.';
 }
 
-export default function App() {
-  const parametros = useLocalSearchParams<{ aba?: string }>();
-  const [gmail, setGmail] = useState('');
+// Gerencia login, cadastro e solicitação de redefinição de senha.
+// Lê o modo inicial da rota e envia as ações de autenticação ao Supabase.
+export default function Login() {
+  const parametrosDaRota = useLocalSearchParams<{ aba?: string }>();
+  const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [nome, setNome] = useState('');
-  const [aba, setAba] = useState<'entrar' | 'criar'>(
-    parametros.aba === 'criar' ? 'criar' : 'entrar'
+  const [nomeCompleto, setNomeCompleto] = useState('');
+  const [modoAutenticacao, setModoAutenticacao] = useState<'entrar' | 'criar'>(
+    parametrosDaRota.aba === 'criar' ? 'criar' : 'entrar'
   );
-  const [verSenha, setVerSenha] = useState(false);
-  const [carregando, setCarregando] = useState(false);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [processandoAutenticacao, setProcessandoAutenticacao] = useState(false);
   const router = useRouter();
 
-  const confirmar = async () => {
+  // Valida os campos e executa login ou cadastro conforme a aba escolhida.
+  const confirmarAutenticacao = async () => {
     // O mesmo botão faz login ou cadastro, dependendo da aba selecionada.
-    if (!gmail || !senha) {
+    if (!email || !senha) {
       Alert.alert("Erro", "Preencha os campos!");
       return;
     }
-    if (aba === 'criar' && !nome.trim()) {
+    if (modoAutenticacao === 'criar' && !nomeCompleto.trim()) {
       Alert.alert('Erro', 'Preencha o nome!');
       return;
     }
 
-    setCarregando(true);
+    setProcessandoAutenticacao(true);
 
     try {
-      const email = gmail.trim().toLowerCase();
-      const { ok, corpo: dados } = await enviarAutenticacao(
-        aba === 'entrar' ? 'token?grant_type=password' : 'signup',
-        aba === 'entrar'
-          ? { email, password: senha }
-          : { email, password: senha, data: { nome: nome.trim() } }
+      const emailNormalizado = email.trim().toLowerCase();
+      const { ok, corpo: dadosDaResposta } = await enviarAutenticacao(
+        modoAutenticacao === 'entrar' ? 'token?grant_type=password' : 'signup',
+        modoAutenticacao === 'entrar'
+          ? { email: emailNormalizado, password: senha }
+          : { email: emailNormalizado, password: senha, data: { nome: nomeCompleto.trim() } }
       );
 
       if (!ok) {
         Alert.alert(
-          aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
-          mensagemDeErro(dados)
+          modoAutenticacao === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+          formatarMensagemDeErro(dadosDaResposta)
         );
         return;
       }
 
-      const sessao = criarSessao(dados);
+      const sessao = criarSessao(dadosDaResposta);
 
       // No cadastro pode ser necessário confirmar o e-mail antes de ter uma sessão.
       if (!sessao) {
-        if (aba === 'criar' && (dados.user || dados.id)) {
+        if (modoAutenticacao === 'criar' && (dadosDaResposta.user || dadosDaResposta.id)) {
           Alert.alert(
             'Verifique seu e-mail',
             'Conta criada! Confirme o e-mail que enviamos para ativar o seu login.'
@@ -94,7 +99,7 @@ export default function App() {
         }
 
         Alert.alert(
-          aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+          modoAutenticacao === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
           'O servidor não retornou uma sessão válida.'
         );
         return;
@@ -102,16 +107,16 @@ export default function App() {
 
       await salvarSessao(sessao);
 
-      if (aba === 'criar') {
+      if (modoAutenticacao === 'criar') {
         // Depois de criar a conta, salvo também o nome do perfil.
-        const perfilResposta = await salvarOuAtualizarPerfilUsuario(
+        const respostaDoPerfil = await salvarOuAtualizarPerfilUsuario(
           sessao.user.id,
-          nome.trim(),
+          nomeCompleto.trim(),
           await headersAutenticados()
         );
 
-        if (!perfilResposta.ok) {
-          console.error('Erro ao criar perfil:', await perfilResposta.text());
+        if (!respostaDoPerfil.ok) {
+          console.error('Erro ao criar perfil:', await respostaDoPerfil.text());
           Alert.alert(
             'Conta criada',
             'Sua conta foi criada, mas não foi possível salvar os dados do perfil agora.'
@@ -120,13 +125,13 @@ export default function App() {
       }
 
       router.replace('/(tabs)');
-    } catch (erro) {
+    } catch (detalhesErro) {
       Alert.alert(
-        aba === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
-        mensagemDeErro(erro)
+        modoAutenticacao === 'entrar' ? 'Erro no login' : 'Erro no cadastro',
+        formatarMensagemDeErro(detalhesErro)
       );
     } finally {
-      setCarregando(false);
+      setProcessandoAutenticacao(false);
     }
   };
 
@@ -147,32 +152,32 @@ export default function App() {
         />
         <Text style={styles.titulo}>EduFinance</Text>
         <Text style={styles.subtitulo}>
-          {aba === 'entrar' ? 'Que bom te ver de novo!' : 'Crie sua conta gratuita'}
+          {modoAutenticacao === 'entrar' ? 'Que bom te ver de novo!' : 'Crie sua conta gratuita'}
         </Text>
 
         <View style={styles.card}>
           {/* Essa barra escolhe entre entrar e criar uma conta. */}
           <View style={styles.abas}>
             <Pressable
-              style={[styles.aba, aba === 'entrar' && styles.abaAtiva]}
-              onPress={() => setAba('entrar')}
+              style={[styles.aba, modoAutenticacao === 'entrar' && styles.abaAtiva]}
+              onPress={() => setModoAutenticacao('entrar')}
             >
-              <Text style={[styles.abaTexto, aba === 'entrar' && styles.abaTextoAtivo]}>
+              <Text style={[styles.abaTexto, modoAutenticacao === 'entrar' && styles.abaTextoAtivo]}>
                 Entrar
               </Text>
             </Pressable>
 
             <Pressable
-              style={[styles.aba, aba === 'criar' && styles.abaAtiva]}
-              onPress={() => setAba('criar')}
+              style={[styles.aba, modoAutenticacao === 'criar' && styles.abaAtiva]}
+              onPress={() => setModoAutenticacao('criar')}
             >
-              <Text style={[styles.abaTexto, aba === 'criar' && styles.abaTextoAtivo]}>
+              <Text style={[styles.abaTexto, modoAutenticacao === 'criar' && styles.abaTextoAtivo]}>
                 Criar conta
               </Text>
             </Pressable>
           </View>
 
-          {aba === 'entrar' ? (
+          {modoAutenticacao === 'entrar' ? (
             <View>
               <Text style={styles.label}>E-mail</Text>
               <View style={styles.inputWrap}>
@@ -181,8 +186,8 @@ export default function App() {
                   style={styles.input}
                   placeholder="Digite seu e-mail"
                   placeholderTextColor="#94A3B8"
-                  value={gmail}
-                  onChangeText={(t) => setGmail(t.trim())}
+                  value={email}
+                  onChangeText={(textoDigitado) => setEmail(textoDigitado.trim())}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoCorrect={false}
@@ -196,20 +201,20 @@ export default function App() {
                   style={styles.input}
                   placeholder="Digite sua senha"
                   placeholderTextColor="#94A3B8"
-                  secureTextEntry={!verSenha}
+                  secureTextEntry={!mostrarSenha}
                   value={senha}
                   onChangeText={setSenha}
                 />
-                <Pressable onPress={() => setVerSenha(!verSenha)} style={styles.olho}>
-                  {verSenha
+                <Pressable onPress={() => setMostrarSenha(!mostrarSenha)} style={styles.olho}>
+                  {mostrarSenha
                     ? <EyeOff size={18} color="#94A3B8" />
                     : <Eye size={18} color="#94A3B8" />}
                 </Pressable>
               </View>
 
               <Botao
-                title={carregando ? 'Entrando...' : 'Acessar Conta'}
-                onPress={confirmar}
+                title={processandoAutenticacao ? 'Entrando...' : 'Acessar Conta'}
+                onPress={confirmarAutenticacao}
                 color="#1A9E75"
                 textColor="#fff"
                 style={styles.btn}
@@ -218,23 +223,23 @@ export default function App() {
               <Pressable
                 style={styles.link}
                 onPress={async () => {
-                  if (!gmail) {
+                  if (!email) {
                     Alert.alert('Esqueci minha senha', 'Digite seu e-mail acima para receber o link de redefinição.');
                     return;
                   }
                   try {
-                    const redirectTo = encodeURIComponent(Linking.createURL('/reset'));
-                    const { ok, corpo: dados } = await enviarAutenticacao(
-                      `recover?redirect_to=${redirectTo}`,
-                      { email: gmail.trim().toLowerCase() }
+                    const urlRetornoCodificada = encodeURIComponent(Linking.createURL('/reset'));
+                    const { ok, corpo: dadosDaResposta } = await enviarAutenticacao(
+                      `recover?redirect_to=${urlRetornoCodificada}`,
+                      { email: email.trim().toLowerCase() }
                     );
 
                     if (!ok) {
-                      Alert.alert('Erro', mensagemDeErro(dados));
+                      Alert.alert('Erro', formatarMensagemDeErro(dadosDaResposta));
                       return;
                     }
 
-                    Alert.alert('E-mail enviado!', `Enviamos um link de redefinição de senha para ${gmail}. Verifique sua caixa de entrada.`);
+                    Alert.alert('E-mail enviado!', `Enviamos um link de redefinição de senha para ${email}. Verifique sua caixa de entrada.`);
                   } catch {
                     Alert.alert('Erro', 'Não foi possível enviar o link. Tente novamente.');
                   }
@@ -252,8 +257,8 @@ export default function App() {
                   style={styles.input}
                   placeholder="Como quer ser chamado?"
                   placeholderTextColor="#94A3B8"
-                  value={nome}
-                  onChangeText={setNome}
+                  value={nomeCompleto}
+                  onChangeText={setNomeCompleto}
                 />
               </View>
 
@@ -264,8 +269,8 @@ export default function App() {
                   style={styles.input}
                   placeholder="Seu melhor e-mail"
                   placeholderTextColor="#94A3B8"
-                  value={gmail}
-                  onChangeText={setGmail}
+                  value={email}
+                  onChangeText={setEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoCorrect={false}
@@ -279,20 +284,20 @@ export default function App() {
                   style={styles.input}
                   placeholder="Mínimo 6 caracteres"
                   placeholderTextColor="#94A3B8"
-                  secureTextEntry={!verSenha}
+                  secureTextEntry={!mostrarSenha}
                   value={senha}
                   onChangeText={setSenha}
                 />
-                <Pressable onPress={() => setVerSenha(!verSenha)} style={styles.olho}>
-                  {verSenha
+                <Pressable onPress={() => setMostrarSenha(!mostrarSenha)} style={styles.olho}>
+                  {mostrarSenha
                     ? <EyeOff size={18} color="#94A3B8" />
                     : <Eye size={18} color="#94A3B8" />}
                 </Pressable>
               </View>
 
               <Botao
-                title={carregando ? 'Cadastrando...' : 'Finalizar Cadastro'}
-                onPress={confirmar}
+                title={processandoAutenticacao ? 'Cadastrando...' : 'Finalizar Cadastro'}
+                onPress={confirmarAutenticacao}
                 color="#1A9E75"
                 textColor="#fff"
                 style={styles.btn}
@@ -426,3 +431,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+/*
+ARQUIVO: app/login.tsx
+
+Responsabilidade:
+Permitir entrar, criar uma conta e solicitar o link de redefinição de senha.
+
+Principais elementos:
+- Login()
+- confirmarAutenticacao()
+- formatarMensagemDeErro()
+- criação/armazenamento da sessão
+
+Fluxo:
+Formulário -> autenticação Supabase -> sessão/perfil -> área de abas
+
+Conceitos usados:
+- estado controlado com useState
+- async/await
+- tratamento de erros
+- payloads JSON e sessão tipada
+*/

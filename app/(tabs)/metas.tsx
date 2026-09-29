@@ -8,6 +8,8 @@ import { formatarMoeda } from '../../utils/formatacao';
 import { atualizarProgressoDaMeta, buscarMetas, consultarValoresAtuaisDaMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
+// Carrega, cria, exclui e atualiza o progresso das metas do usuário.
+// Usa callbacks dos modais para executar as operações e atualizar a lista exibida.
 export default function Metas() {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [carregandoMetas, setCarregandoMetas] = useState(true);
@@ -16,22 +18,23 @@ export default function Metas() {
   const [valorDeposito, setValorDeposito] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [titulo, setTitulo] = useState('');
-  const [total, setTotal] = useState('');
+  const [valorObjetivoTexto, setValorObjetivoTexto] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [depositando, setDepositando] = useState(false);
-  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [excluindoMetaId, setExcluindoMetaId] = useState<string | null>(null);
 
+  // Busca as metas atuais do usuário e atualiza os estados de carregamento/erro.
   async function carregarMetas() {
     // Atualizo as metas quando a tela abre para mostrar os valores atuais.
     setCarregandoMetas(true);
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) throw new Error('Usuário não autenticado.');
-      const lista = await buscarMetas(usuario.id, await headersAutenticados());
-      setMetas(lista);
+      const metasRecebidas = await buscarMetas(usuario.id, await headersAutenticados());
+      setMetas(metasRecebidas);
       setErroMetas(null);
-    } catch (error) {
-      console.error('Erro ao carregar metas:', error);
+    } catch (detalhesErro) {
+      console.error('Erro ao carregar metas:', detalhesErro);
       setErroMetas('Não foi possível carregar as metas.');
     } finally {
       setCarregandoMetas(false);
@@ -45,45 +48,49 @@ export default function Metas() {
     }, [])
   );
 
-  async function adicionarMeta(nome: string, objetivo: number) {
+  // Cria uma meta no banco e recarrega a lista apresentada na tela.
+  async function adicionarMeta(tituloMeta: string, valorObjetivo: number) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    await criarMeta(usuario.id, nome, objetivo, await headersAutenticados());
+    await criarMeta(usuario.id, tituloMeta, valorObjetivo, await headersAutenticados());
     await carregarMetas();
     return { sucesso: true, mensagem: '' };
   }
 
-  async function excluirMeta(id: string) {
+  // Exclui a meta selecionada e atualiza os dados mostrados.
+  async function excluirMeta(metaId: string) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    await excluirMetaNoBanco(usuario.id, id, await headersAutenticados());
+    await excluirMetaNoBanco(usuario.id, metaId, await headersAutenticados());
     await carregarMetas();
     return { sucesso: true, mensagem: '' };
   }
 
-  async function depositar(id: string, valor: number) {
+  // Soma um depósito ao progresso atual, protegendo contra atualização concorrente.
+  async function depositar(metaId: string, valorDeposito: number) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
-    const headers = await headersAutenticados();
-    const registro = await consultarValoresAtuaisDaMeta(usuario.id, id, headers);
-    if (!registro) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
-    const valorAnterior = Number(registro.valor_atual);
+    const cabecalhosAutenticados = await headersAutenticados();
+    const valoresAtuaisMeta = await consultarValoresAtuaisDaMeta(usuario.id, metaId, cabecalhosAutenticados);
+    if (!valoresAtuaisMeta) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
+    const valorAnterior = Number(valoresAtuaisMeta.valor_atual);
     // Busco o valor de novo para não apagar uma alteração feita em outro lugar.
-    const novoValor = valorAnterior + valor;
-    await atualizarProgressoDaMeta(usuario.id, id, valorAnterior, novoValor, headers);
+    const novoValor = valorAnterior + valorDeposito;
+    await atualizarProgressoDaMeta(usuario.id, metaId, valorAnterior, novoValor, cabecalhosAutenticados);
     await carregarMetas();
     return { sucesso: true, mensagem: '' };
   }
 
-  const metasAndamento = (metas ?? []).filter(
-    (m: Meta) => m.atual < m.total
+  const metasEmAndamento = (metas ?? []).filter(
+    (metaAtual: Meta) => metaAtual.atual < metaAtual.total
   );
 
   const metasConcluidas = (metas ?? []).filter(
-    (m: Meta) => m.atual >= m.total
+    (metaAtual: Meta) => metaAtual.atual >= metaAtual.total
   );
 
-  const salvar = async () => {
+  // Valida os campos do formulário e solicita a criação da meta.
+  const salvarNovaMeta = async () => {
     // Antes de mandar para o banco, confiro os campos e transformo a vírgula em ponto.
     if (salvando) return;
 
@@ -93,40 +100,40 @@ export default function Metas() {
       return;
     }
 
-    if (!total.trim()) {
+    if (!valorObjetivoTexto.trim()) {
       Alert.alert('Valor obrigatório', 'Informe o valor necessário para a meta.');
       return;
     }
 
-    const valor = Number(total.trim().replace(',', '.'));
-    if (!Number.isFinite(valor) || valor <= 0) {
+    const valorObjetivo = Number(valorObjetivoTexto.trim().replace(',', '.'));
+    if (!Number.isFinite(valorObjetivo) || valorObjetivo <= 0) {
       Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
       return;
     }
 
     setSalvando(true);
     try {
-      const resultado = await adicionarMeta(tituloLimpo, valor);
+      const resultadoOperacao = await adicionarMeta(tituloLimpo, valorObjetivo);
 
-      if (!resultado.sucesso) {
-        Alert.alert('Erro ao criar meta', resultado.mensagem);
+      if (!resultadoOperacao.sucesso) {
+        Alert.alert('Erro ao criar meta', resultadoOperacao.mensagem);
         return;
       }
 
       Alert.alert('Sucesso', 'Meta criada com sucesso!');
       setTitulo('');
-      setTotal('');
+      setValorObjetivoTexto('');
       setModalAberto(false);
-    } catch (error) {
-      console.error('Erro inesperado ao criar meta:', error);
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao criar meta:', detalhesErro);
       Alert.alert('Erro ao criar meta', 'Não foi possível criar a meta. Tente novamente.');
     } finally {
       setSalvando(false);
     }
   };
 
-  const confirmarExclusao = (id: string) => {
-    if (excluindoId === id) return;
+  const confirmarExclusao = (metaId: string) => {
+    if (excluindoMetaId === metaId) return;
 
     Alert.alert('Excluir meta', 'Deseja realmente excluir esta meta?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -134,23 +141,24 @@ export default function Metas() {
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          setExcluindoId(id);
+          setExcluindoMetaId(metaId);
           try {
-            const resultado = await excluirMeta(id);
-            if (!resultado.sucesso) {
-              Alert.alert('Erro ao excluir', resultado.mensagem);
+            const resultadoOperacao = await excluirMeta(metaId);
+            if (!resultadoOperacao.sucesso) {
+              Alert.alert('Erro ao excluir', resultadoOperacao.mensagem);
             }
-          } catch (error) {
-            console.error('Erro inesperado ao excluir meta:', error);
+          } catch (detalhesErro) {
+            console.error('Erro inesperado ao excluir meta:', detalhesErro);
             Alert.alert('Erro ao excluir', 'Não foi possível excluir a meta. Tente novamente.');
           } finally {
-            setExcluindoId(null);
+            setExcluindoMetaId(null);
           }
         },
       },
     ]);
   };
 
+  // Valida o valor e a meta antes de solicitar o depósito.
   const confirmarDeposito = async () => {
     if (depositando || !metaSelecionada) return;
 
@@ -159,46 +167,46 @@ export default function Metas() {
       return;
     }
 
-    const valor = Number(valorDeposito.trim().replace(',', '.'));
-    if (!Number.isFinite(valor) || valor <= 0) {
+    const valorDepositoNumerico = Number(valorDeposito.trim().replace(',', '.'));
+    if (!Number.isFinite(valorDepositoNumerico) || valorDepositoNumerico <= 0) {
       Alert.alert('Valor inválido', 'Informe um valor maior que zero.');
       return;
     }
 
-    const meta = metas.find((item: Meta) => item.id === metaSelecionada);
-    if (!meta) {
+    const metaSelecionadaAtual = metas.find((metaAtual: Meta) => metaAtual.id === metaSelecionada);
+    if (!metaSelecionadaAtual) {
       Alert.alert('Meta não encontrada', 'Não foi possível localizar a meta selecionada.');
       return;
     }
 
-    const restante = meta.total - meta.atual;
+    const valorRestanteMeta = metaSelecionadaAtual.total - metaSelecionadaAtual.atual;
     // Não deixo depositar mais dinheiro do que falta para a meta.
-    if (restante <= 0) {
+    if (valorRestanteMeta <= 0) {
       Alert.alert('Meta concluída', 'Esta meta já foi concluída.');
       return;
     }
 
-    if (valor > restante) {
+    if (valorDepositoNumerico > valorRestanteMeta) {
       Alert.alert(
         'Valor acima do necessário',
-        `Faltam R$ ${formatarMoeda(restante)} para concluir esta meta.`
+        `Faltam R$ ${formatarMoeda(valorRestanteMeta)} para concluir esta meta.`
       );
       return;
     }
 
     setDepositando(true);
     try {
-      const resultado = await depositar(metaSelecionada, valor);
-      if (!resultado.sucesso) {
-        Alert.alert('Erro ao depositar', resultado.mensagem);
+      const resultadoOperacao = await depositar(metaSelecionada, valorDepositoNumerico);
+      if (!resultadoOperacao.sucesso) {
+        Alert.alert('Erro ao depositar', resultadoOperacao.mensagem);
         return;
       }
 
       Alert.alert('Sucesso', 'Depósito realizado!');
       setValorDeposito('');
       setMetaSelecionada(null);
-    } catch (error) {
-      console.error('Erro inesperado ao depositar:', error);
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao depositar:', detalhesErro);
       Alert.alert('Erro ao depositar', 'Não foi possível realizar o depósito. Tente novamente.');
     } finally {
       setDepositando(false);
@@ -241,39 +249,39 @@ export default function Metas() {
       )}
 
       {/* Em andamento */}
-      {metasAndamento.length > 0 && (
+      {metasEmAndamento.length > 0 && (
         <>
           <Text style={styles.secaoTitulo}>EM ANDAMENTO</Text>
-          {metasAndamento.map((meta: Meta) => {
-            const pct =
-              meta.total > 0
-                ? Math.min(Math.round((meta.atual / meta.total) * 100), 100)
+          {metasEmAndamento.map((metaAtual: Meta) => {
+            const percentualConcluido =
+              metaAtual.total > 0
+                ? Math.min(Math.round((metaAtual.atual / metaAtual.total) * 100), 100)
                 : 0;
             return (
-              <View key={meta.id} style={styles.card}>
+              <View key={metaAtual.id} style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Text style={styles.metaTitulo}>{meta.titulo}</Text>
+                  <Text style={styles.metaTitulo}>{metaAtual.titulo}</Text>
                   <TouchableOpacity
-                    onPress={() => confirmarExclusao(meta.id)}
-                    disabled={excluindoId === meta.id}
+                    onPress={() => confirmarExclusao(metaAtual.id)}
+                    disabled={excluindoMetaId === metaAtual.id}
                   >
                     <Trash2 size={18} color="#ccc" />
                   </TouchableOpacity>
                 </View>
 
                 <View style={styles.progressoBg}>
-                  <View style={[styles.progressoFill, { width: `${pct}%` }]} />
+                  <View style={[styles.progressoFill, { width: `${percentualConcluido}%` }]} />
                 </View>
 
                 <View style={styles.cardFooter}>
                   <View>
-                    <Text style={styles.valorAtual}>R$ {formatarMoeda(meta.atual)}</Text>
-                    <Text style={styles.valorTotal}>de R$ {formatarMoeda(meta.total)}</Text>
+                    <Text style={styles.valorAtual}>R$ {formatarMoeda(metaAtual.atual)}</Text>
+                    <Text style={styles.valorTotal}>de R$ {formatarMoeda(metaAtual.total)}</Text>
                   </View>
-                  <Text style={styles.pct}>{pct}%</Text>
+                  <Text style={styles.pct}>{percentualConcluido}%</Text>
                 </View>
 
-                <TouchableOpacity style={styles.btnDepositar} onPress={() => setMetaSelecionada(meta.id)}>
+                <TouchableOpacity style={styles.btnDepositar} onPress={() => setMetaSelecionada(metaAtual.id)}>
                   <Text style={styles.btnDepositarTexto}>+ Depositar</Text>
                 </TouchableOpacity>
               </View>
@@ -286,12 +294,12 @@ export default function Metas() {
       {metasConcluidas.length > 0 && (
         <>
           <Text style={styles.secaoTitulo}>CONCLUÍDAS</Text>
-          {metasConcluidas.map((meta: Meta) => (
-            <View key={meta.id} style={[styles.card, styles.cardConcluida]}>
+          {metasConcluidas.map((metaAtual: Meta) => (
+            <View key={metaAtual.id} style={[styles.card, styles.cardConcluida]}>
               <View style={styles.cardHeader}>
                 <View>
-                  <Text style={styles.metaTitulo}>{meta.titulo}</Text>
-                  <Text style={styles.concluidaTexto}>Concluída! R$ {formatarMoeda(meta.total)}</Text>
+                  <Text style={styles.metaTitulo}>{metaAtual.titulo}</Text>
+                  <Text style={styles.concluidaTexto}>Concluída! R$ {formatarMoeda(metaAtual.total)}</Text>
                 </View>
                 <Check size={22} color="#1A9E75" />
               </View>
@@ -309,7 +317,7 @@ export default function Metas() {
         </View>
       )}
 
-      <ModalNovaMeta visivel={modalAberto} titulo={titulo} total={total} salvando={salvando} setTitulo={setTitulo} setTotal={setTotal} salvar={salvar} fechar={() => setModalAberto(false)} />
+      <ModalNovaMeta visivel={modalAberto} titulo={titulo} total={valorObjetivoTexto} salvando={salvando} setTitulo={setTitulo} setTotal={setValorObjetivoTexto} salvar={salvarNovaMeta} fechar={() => setModalAberto(false)} />
       <ModalDeposito visivel={metaSelecionada !== null} valor={valorDeposito} depositando={depositando} setValor={setValorDeposito} confirmar={confirmarDeposito} fechar={() => setMetaSelecionada(null)} />
 
     </ScrollView>
@@ -408,3 +416,25 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 18, fontWeight: 'bold', marginBottom: 8 },
   vazioSubtitulo: { fontSize: 14, color: '#888', textAlign: 'center' },
 });
+
+/*
+ARQUIVO: app/(tabs)/metas.tsx
+
+Responsabilidade:
+Gerenciar metas financeiras e depósitos associados a cada meta.
+
+Principais elementos:
+- Metas()
+- carregarMetas()
+- adicionarMeta() e excluirMeta()
+- depositar() e confirmarDeposito()
+
+Fluxo:
+Sessão do usuário -> operações no Supabase -> atualização de metas e interface
+
+Conceitos usados:
+- useState e useFocusEffect
+- async/await e callbacks
+- validação de valores monetários
+- atualização protegida pelo valor anterior
+*/

@@ -6,38 +6,43 @@ import type { Dica, Meta, Transacao, Video } from '../../types';
 import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
+// Busca as dicas cadastradas no Supabase para alimentar a central de aprendizado.
+// Não recebe argumentos; retorna as dicas tipadas ou lança erro quando a API falha.
 async function buscarDicas(): Promise<Dica[]> {
   // As dicas ficam salvas no banco para poderem ser atualizadas sem mudar o app.
-  const resposta = await executarRequisicaoRest('dicas?select=*&order=created_at.desc', {
+  const respostaDaApi = await executarRequisicaoRest('dicas?select=*&order=created_at.desc', {
     headers: await headersAutenticados(),
   });
 
-  if (!resposta.ok) {
-    const detalhe = await resposta.text();
-    throw new Error(`Não foi possível buscar as dicas (${resposta.status}): ${detalhe}`);
+  if (!respostaDaApi.ok) {
+    const detalhesErro = await respostaDaApi.text();
+    throw new Error(`Não foi possível buscar as dicas (${respostaDaApi.status}): ${detalhesErro}`);
   }
 
-  return (await resposta.json()) as Dica[];
+  return (await respostaDaApi.json()) as Dica[];
 }
 
+// Escolhe o componente de ícone correspondente à categoria da dica.
+// Recebe a categoria e o tamanho; retorna o ícone associado.
 function iconeDaDica(categoria: string, tamanho = 28) {
   // Cada categoria tem um ícone para ficar mais fácil reconhecer o assunto.
-  const props = { size: tamanho, color: categoria === 'Comportamento' ? '#6A1B9A' : '#1A9E75' };
+  const propriedadesIcone = { size: tamanho, color: categoria === 'Comportamento' ? '#6A1B9A' : '#1A9E75' };
   const icones: Record<string, React.ReactNode> = {
-    Educação: <Ruler {...props} />,
-    Investimento: <TrendingUp {...props} />,
-    Comportamento: <Brain {...props} />,
-    Segurança: <Shield {...props} />,
-    Crédito: <DollarSign {...props} />,
-    Empreendedorismo: <Puzzle {...props} />,
+    Educação: <Ruler {...propriedadesIcone} />,
+    Investimento: <TrendingUp {...propriedadesIcone} />,
+    Comportamento: <Brain {...propriedadesIcone} />,
+    Segurança: <Shield {...propriedadesIcone} />,
+    Crédito: <DollarSign {...propriedadesIcone} />,
+    Empreendedorismo: <Puzzle {...propriedadesIcone} />,
   };
-  return icones[categoria] ?? <DollarSign {...props} />;
+  return icones[categoria] ?? <DollarSign {...propriedadesIcone} />;
 }
 
-const getYoutubeThumbnail = (url: string) => {
+// Extrai o identificador do vídeo e monta a URL de sua miniatura no YouTube.
+const obterMiniaturaDoYoutube = (urlVideo: string) => {
   // O próprio YouTube fornece uma imagem usando o id do vídeo.
-  const match = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : undefined;
+  const correspondenciaVideo = urlVideo.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
+  return correspondenciaVideo ? `https://img.youtube.com/vi/${correspondenciaVideo[1]}/hqdefault.jpg` : undefined;
 };
 
 const VIDEOS: Video[] = [
@@ -91,6 +96,8 @@ const CORES_TEXTO: { [key: string]: string } = {
   Crédito: '#E65100',
 };
 
+// Carrega dicas, dados financeiros e análise personalizada para a tela.
+// Usa refs para evitar chamadas repetidas durante o intervalo de atualização.
 export default function Dicas() {
   const [dicas, setDicas] = useState<Dica[]>([]);
   const [carregandoDicas, setCarregandoDicas] = useState(true);
@@ -104,30 +111,31 @@ export default function Dicas() {
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
 
-  const carregamentoEmAndamento = useRef(false);
+  const carregamentoDaTelaEmAndamento = useRef(false);
   const ultimoCarregamento = useRef(0);
 
-  const carregarTela = useCallback(async (forcar = false) => {
+  // Evita chamadas simultâneas e reutiliza os dados até o intervalo de cache expirar.
+  const carregarConteudoDaTela = useCallback(async (forcar = false) => {
     // Evito várias chamadas seguidas quando a pessoa entra e sai da tela.
-    if (carregamentoEmAndamento.current) return;
+    if (carregamentoDaTelaEmAndamento.current) return;
     if (!forcar && Date.now() - ultimoCarregamento.current < 30_000) return;
-    carregamentoEmAndamento.current = true;
+    carregamentoDaTelaEmAndamento.current = true;
     setCarregandoDicas(true);
     setCarregandoAnalise(true);
     setErroDicas(null);
     setErroAnalise(null);
 
-    let dicasDoBanco: Dica[];
+    let dicasRecebidas: Dica[];
     try {
-      dicasDoBanco = await buscarDicas();
-      setDicas(dicasDoBanco);
-    } catch (error) {
-      console.error(error);
+      dicasRecebidas = await buscarDicas();
+      setDicas(dicasRecebidas);
+    } catch (detalhesErro) {
+      console.error(detalhesErro);
       setErroDicas('Não foi possível carregar as dicas. Toque em atualizar para tentar novamente.');
       setErroAnalise('A análise depende das dicas cadastradas e não pôde ser gerada agora.');
       setCarregandoDicas(false);
       setCarregandoAnalise(false);
-      carregamentoEmAndamento.current = false;
+      carregamentoDaTelaEmAndamento.current = false;
       ultimoCarregamento.current = Date.now();
       return;
     }
@@ -136,23 +144,23 @@ export default function Dicas() {
     try {
       const usuario = await obterUsuarioDaSessao();
       if (!usuario) throw new Error('Usuário não autenticado.');
-      const headers = await headersAutenticados();
-      const [listaTransacoes, listaMetas] = await Promise.all([
-        buscarTransacoes(usuario.id, headers),
-        buscarMetas(usuario.id, headers),
+      const cabecalhosAutenticados = await headersAutenticados();
+      const [transacoesRecebidas, metasRecebidas] = await Promise.all([
+        buscarTransacoes(usuario.id, cabecalhosAutenticados),
+        buscarMetas(usuario.id, cabecalhosAutenticados),
       ]);
-      const metasAtivas = listaMetas.filter((meta) => meta.atual < meta.total);
-      setTransacoes(listaTransacoes);
+      const metasAtivas = metasRecebidas.filter((metaAtual) => metaAtual.atual < metaAtual.total);
+      setTransacoes(transacoesRecebidas);
       setMetas(metasAtivas);
 
       // Monto um resumo simples para a análise financeira personalizada.
-      const receitas = listaTransacoes
-        .filter((item) => item.tipo === 'receita')
-        .reduce((total, item) => total + item.valor, 0);
-      const despesas = listaTransacoes
-        .filter((item) => item.tipo === 'despesa')
-        .reduce((total, item) => total + item.valor, 0);
-      const dicasDisponiveis = dicasDoBanco.map(({ id, titulo, descricao, categoria }) => ({
+      const receitas = transacoesRecebidas
+        .filter((transacaoAtual) => transacaoAtual.tipo === 'receita')
+        .reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
+      const despesas = transacoesRecebidas
+        .filter((transacaoAtual) => transacaoAtual.tipo === 'despesa')
+        .reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
+      const dicasDisponiveis = dicasRecebidas.map(({ id, titulo, descricao, categoria }) => ({
         id,
         titulo,
         descricao,
@@ -160,12 +168,12 @@ export default function Dicas() {
       }));
 
       setAnalise(await solicitarAnaliseFinanceiraDaIA({ receitas, despesas, metas: metasAtivas, dicasDisponiveis }));
-    } catch (error) {
-      console.error(error);
+    } catch (detalhesErro) {
+      console.error(detalhesErro);
       setErroAnalise('Não foi possível gerar sua análise agora. Toque em atualizar para tentar novamente.');
     } finally {
       setCarregandoAnalise(false);
-      carregamentoEmAndamento.current = false;
+      carregamentoDaTelaEmAndamento.current = false;
       ultimoCarregamento.current = Date.now();
     }
   }, []);
@@ -173,16 +181,16 @@ export default function Dicas() {
   // Recarrega os dados toda vez que a tela entra em foco no Expo Router
   useFocusEffect(
     useCallback(() => {
-      carregarTela();
-    }, [carregarTela])
+      carregarConteudoDaTela();
+    }, [carregarConteudoDaTela])
   );
 
   // A busca olha no título, descrição e categoria da dica.
   const dicasFiltradas = useMemo(() => {
-    const termo = busca.trim().toLocaleLowerCase('pt-BR');
-    if (!termo) return dicas;
+    const termoBuscaNormalizado = busca.trim().toLocaleLowerCase('pt-BR');
+    if (!termoBuscaNormalizado) return dicas;
     return dicas.filter(({ titulo, descricao, categoria }) =>
-      `${titulo} ${descricao} ${categoria}`.toLocaleLowerCase('pt-BR').includes(termo)
+      `${titulo} ${descricao} ${categoria}`.toLocaleLowerCase('pt-BR').includes(termoBuscaNormalizado)
     );
   }, [busca, dicas]);
 
@@ -206,7 +214,7 @@ export default function Dicas() {
         <View style={styles.destaqueCabecalho}>
           <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
           <TouchableOpacity
-            onPress={() => carregarTela(true)}
+            onPress={() => carregarConteudoDaTela(true)}
             disabled={carregandoAnalise || carregandoDicas}
             accessibilityLabel="Atualizar análise financeira"
             accessibilityHint={`Reanalisa ${transacoes.length} transações e ${metas.length} metas ativas`}
@@ -242,24 +250,24 @@ export default function Dicas() {
 
       {carregandoDicas && <ActivityIndicator color="#1A9E75" style={styles.carregandoLista} />}
       {!carregandoDicas && erroDicas && <Text style={styles.erroLista}>{erroDicas}</Text>}
-      {!carregandoDicas && !erroDicas && dicasVisiveis.map(dica => (
+      {!carregandoDicas && !erroDicas && dicasVisiveis.map((dicaAtual) => (
         <TouchableOpacity
-          key={dica.id}
+          key={dicaAtual.id}
           style={styles.dicaCard}
-          onPress={() => setDicaAberta(dica)}
+          onPress={() => setDicaAberta(dicaAtual)}
           activeOpacity={0.7}
         >
-          <View style={styles.dicaIcone}>{iconeDaDica(dica.categoria)}</View>
+          <View style={styles.dicaIcone}>{iconeDaDica(dicaAtual.categoria)}</View>
           <View style={styles.dicaInfo}>
             <View style={styles.dicaHeaderRow}>
-              <Text style={styles.dicaTitulo}>{dica.titulo}</Text>
-              <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dica.categoria] ?? '#F1F5F9' }]}>
-                <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dica.categoria] ?? '#475569' }]}>
-                  {dica.categoria}
+              <Text style={styles.dicaTitulo}>{dicaAtual.titulo}</Text>
+              <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dicaAtual.categoria] ?? '#F1F5F9' }]}>
+                <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dicaAtual.categoria] ?? '#475569' }]}>
+                  {dicaAtual.categoria}
                 </Text>
               </View>
             </View>
-            <Text style={styles.dicaDescricao} numberOfLines={2}>{dica.descricao}</Text>
+            <Text style={styles.dicaDescricao} numberOfLines={2}>{dicaAtual.descricao}</Text>
             <Text style={styles.verDetalhe}>Ver conteúdo completo ▸</Text>
           </View>
         </TouchableOpacity>
@@ -284,15 +292,15 @@ export default function Dicas() {
       <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
-        {VIDEOS.map(video => (
+        {VIDEOS.map((videoAtual) => (
           <TouchableOpacity
-            key={video.id}
+            key={videoAtual.id}
             style={styles.videoCard}
-            onPress={() => Linking.openURL(video.url)}
+            onPress={() => Linking.openURL(videoAtual.url)}
           >
             {/* Thumbnail */}
             <ImageBackground
-              source={{ uri: video.thumbnail || getYoutubeThumbnail(video.url) }}
+              source={{ uri: videoAtual.thumbnail || obterMiniaturaDoYoutube(videoAtual.url) }}
               style={styles.thumbnail}
               imageStyle={styles.thumbnailImage}
               resizeMode="cover"
@@ -305,11 +313,11 @@ export default function Dicas() {
             {/* Info */}
             <View style={styles.videoInfo}>
               <View style={[styles.badge, { backgroundColor: '#E8F5E9' }]}>
-                <Text style={[styles.badgeTexto, { color: '#2E7D32' }]}>{video.categoria}</Text>
+                <Text style={[styles.badgeTexto, { color: '#2E7D32' }]}>{videoAtual.categoria}</Text>
               </View>
-              <Text style={styles.videoTitulo} numberOfLines={2}>{video.titulo}</Text>
-              <Text style={styles.videoCanal}>{video.canal}</Text>
-              <Text style={styles.videoDuracao}>⏱ {video.duracao}</Text>
+              <Text style={styles.videoTitulo} numberOfLines={2}>{videoAtual.titulo}</Text>
+              <Text style={styles.videoCanal}>{videoAtual.canal}</Text>
+              <Text style={styles.videoDuracao}>⏱ {videoAtual.duracao}</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -343,10 +351,10 @@ export default function Dicas() {
             <ScrollView style={styles.modalConteudo} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalDescricao}>{dicaAberta?.descricao}</Text>
               <View style={styles.modalDivisor} />
-              {dicaAberta?.conteudo.split(/\r?\n/).filter(Boolean).map((item, idx) => (
-                <View key={idx} style={styles.conteudoItem}>
+              {dicaAberta?.conteudo.split(/\r?\n/).filter(Boolean).map((paragrafo, indiceParagrafo) => (
+                <View key={indiceParagrafo} style={styles.conteudoItem}>
                   <Text style={styles.conteudoBullet}>•</Text>
-                  <Text style={styles.conteudoTexto}>{item}</Text>
+                  <Text style={styles.conteudoTexto}>{paragrafo}</Text>
                 </View>
               ))}
             </ScrollView>
@@ -556,3 +564,25 @@ const styles = StyleSheet.create({
   },
   btnEntendiTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
+
+/*
+ARQUIVO: app/(tabs)/dicas.tsx
+
+Responsabilidade:
+Exibir conteúdos educativos e solicitar uma análise financeira personalizada.
+
+Principais elementos:
+- Dicas()
+- buscarDicas()
+- carregarConteudoDaTela()
+- filtro de dicas e contexto enviado à IA
+
+Fluxo:
+Supabase -> dicas e dados financeiros -> análise personalizada -> conteúdo na tela
+
+Conceitos usados:
+- useState, useMemo, useRef e useFocusEffect
+- Promise.all e async/await
+- filtros e listas
+- chamada de Edge Function
+*/

@@ -1,6 +1,8 @@
 import { Tabs } from 'expo-router';
 import { ArrowLeftRight, BarChart2, Home, Lightbulb, Target, User } from 'lucide-react-native';
 
+// Registra as telas que aparecem na barra de navegação inferior.
+// Não recebe props nem retorna dados; configura as rotas da área autenticada.
 export default function TabsLayout() {
   // Cada Tabs.Screen vira uma opção na barra inferior do app.
   return (
@@ -68,3 +70,22 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+/*
+ARQUIVO: app/(tabs)/_layout.tsx
+
+Responsabilidade:
+Configurar as rotas e opções visuais da navegação por abas.
+
+Principais elementos:
+- TabsLayout()
+- Tabs.Screen para as telas principais
+
+Fluxo:
+Área autenticada -> seleção de uma aba -> tela correspondente
+
+Conceitos usados:
+- Expo Router Tabs
+- opções e ícones de navegação
+- componentes de layout
+*/
