@@ -37,21 +37,24 @@ const ICONES_TIPO: { [key: string]: React.ReactNode } = {
   sistema: <Bell size={18} color="#6A1B9A" />,
 };
 
-function formatarTempo(criadaEm: string): string {
-  // Transformo a data em um texto mais fácil de entender, tipo "5 min atrás".
-  const data = new Date(criadaEm);
-  if (isNaN(data.getTime())) return '';
-  const agora = new Date();
-  const diff = agora.getTime() - data.getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'agora';
-  if (min < 60) return `${min} min atrás`;
-  const horas = Math.floor(min / 60);
-  if (horas < 24) return `${horas} h atrás`;
-  const dias = Math.floor(horas / 24);
-  return `${dias} d atrás`;
+// Converte a data de criação em um intervalo legível, como "5 min atrás".
+// Recebe a data em texto; retorna o tempo decorrido ou uma string vazia se for inválida.
+function formatarTempoDecorrido(dataCriacao: string): string {
+  const dataNotificacao = new Date(dataCriacao);
+  if (isNaN(dataNotificacao.getTime())) return '';
+  const dataAtual = new Date();
+  const diferencaEmMs = dataAtual.getTime() - dataNotificacao.getTime();
+  const minutosDecorridos = Math.floor(diferencaEmMs / 60000);
+  if (minutosDecorridos < 1) return 'agora';
+  if (minutosDecorridos < 60) return `${minutosDecorridos} min atrás`;
+  const horasDecorridas = Math.floor(minutosDecorridos / 60);
+  if (horasDecorridas < 24) return `${horasDecorridas} h atrás`;
+  const diasDecorridos = Math.floor(horasDecorridas / 24);
+  return `${diasDecorridos} d atrás`;
 }
 
+// Apresenta notificações e permite marcá-las como lidas ou excluí-las.
+// Recebe dados e callbacks da tela; não retorna dados, apenas executa as ações solicitadas.
 export default function NotificacoesModal({
   visivel,
   onFechar,
@@ -63,48 +66,51 @@ export default function NotificacoesModal({
   excluir,
 }: Props) {
   // Esses estados impedem repetir uma ação enquanto ela ainda está carregando.
-  const [marcandoId, setMarcandoId] = useState<string | null>(null);
-  const [marcandoTodas, setMarcandoTodas] = useState(false);
-  const [excluindoId, setExcluindoId] = useState<string | null>(null);
+  const [marcandoNotificacaoId, setMarcandoNotificacaoId] = useState<string | null>(null);
+  const [marcandoTodasNotificacoes, setMarcandoTodasNotificacoes] = useState(false);
+  const [excluindoNotificacaoId, setExcluindoNotificacaoId] = useState<string | null>(null);
 
-  const lerNotificacao = async (item: Notificacao) => {
+  // Chama a ação da tela apenas se a notificação ainda não estiver sendo processada.
+  const marcarNotificacaoComoLida = async (notificacaoAtual: Notificacao) => {
     // Notificação já lida não precisa chamar a API outra vez.
-    if (item.lida || marcandoId === item.id) return;
+    if (notificacaoAtual.lida || marcandoNotificacaoId === notificacaoAtual.id) return;
 
-    setMarcandoId(item.id);
+    setMarcandoNotificacaoId(notificacaoAtual.id);
     try {
-      const resultado = await marcarLida(item.id);
-      if (!resultado.sucesso) {
-        Alert.alert('Erro', resultado.mensagem);
+      const resultadoOperacao = await marcarLida(notificacaoAtual.id);
+      if (!resultadoOperacao.sucesso) {
+        Alert.alert('Erro', resultadoOperacao.mensagem);
       }
-    } catch (error) {
-      console.error('Erro inesperado ao marcar notificação:', error);
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao marcar notificação:', detalhesErro);
       Alert.alert('Erro', 'Não foi possível marcar a notificação como lida.');
     } finally {
-      setMarcandoId(null);
+      setMarcandoNotificacaoId(null);
     }
   };
 
-  const lerTodas = async () => {
-    if (marcandoTodas) return;
+  // Solicita à tela que marque todas as notificações como lidas.
+  const marcarTodasComoLidas = async () => {
+    if (marcandoTodasNotificacoes) return;
 
-    setMarcandoTodas(true);
+    setMarcandoTodasNotificacoes(true);
     try {
-      const resultado = await marcarTodasLidas();
-      if (!resultado.sucesso) {
-        Alert.alert('Erro', resultado.mensagem);
+      const resultadoOperacao = await marcarTodasLidas();
+      if (!resultadoOperacao.sucesso) {
+        Alert.alert('Erro', resultadoOperacao.mensagem);
       }
-    } catch (error) {
-      console.error('Erro inesperado ao marcar todas como lidas:', error);
+    } catch (detalhesErro) {
+      console.error('Erro inesperado ao marcar todas como lidas:', detalhesErro);
       Alert.alert('Erro', 'Não foi possível marcar todas as notificações como lidas.');
     } finally {
-      setMarcandoTodas(false);
+      setMarcandoTodasNotificacoes(false);
     }
   };
 
-  const confirmarExclusao = (id: string) => {
+  // Confirma a exclusão antes de executar o callback recebido da tela.
+  const confirmarExclusao = (notificacaoId: string) => {
     // Peço confirmação porque essa ação apaga a notificação.
-    if (excluindoId === id) return;
+    if (excluindoNotificacaoId === notificacaoId) return;
 
     Alert.alert('Excluir notificação', 'Deseja realmente excluir esta notificação?', [
       { text: 'Cancelar', style: 'cancel' },
@@ -112,53 +118,53 @@ export default function NotificacoesModal({
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          setExcluindoId(id);
+          setExcluindoNotificacaoId(notificacaoId);
           try {
-            const resultado = await excluir(id);
-            if (!resultado.sucesso) {
-              Alert.alert('Erro', resultado.mensagem);
+            const resultadoOperacao = await excluir(notificacaoId);
+            if (!resultadoOperacao.sucesso) {
+              Alert.alert('Erro', resultadoOperacao.mensagem);
             }
-          } catch (error) {
-            console.error('Erro inesperado ao excluir notificação:', error);
+          } catch (detalhesErro) {
+            console.error('Erro inesperado ao excluir notificação:', detalhesErro);
             Alert.alert('Erro', 'Não foi possível excluir a notificação.');
           } finally {
-            setExcluindoId(null);
+            setExcluindoNotificacaoId(null);
           }
         },
       },
     ]);
   };
 
-  const renderItem = ({ item }: { item: Notificacao }) => {
-    // O tipo escolhe as cores e o ícone de cada item.
-    const estilo = CORES_TIPO[item.tipo] || CORES_TIPO.sistema;
-    const icone = ICONES_TIPO[item.tipo] || ICONES_TIPO.sistema;
+  // Constrói a linha de uma notificação usando o tipo para escolher ícone e cores.
+  const renderizarNotificacao = ({ item: notificacaoAtual }: { item: Notificacao }) => {
+    const estiloNotificacao = CORES_TIPO[notificacaoAtual.tipo] || CORES_TIPO.sistema;
+    const iconeNotificacao = ICONES_TIPO[notificacaoAtual.tipo] || ICONES_TIPO.sistema;
 
     return (
       <View
-        style={[styles.item, !item.lida && styles.itemNaoLida]}
+        style={[styles.item, !notificacaoAtual.lida && styles.itemNaoLida]}
       >
         <TouchableOpacity
           style={styles.itemConteudo}
-          onPress={() => lerNotificacao(item)}
-          disabled={item.lida || marcandoId === item.id}
+          onPress={() => marcarNotificacaoComoLida(notificacaoAtual)}
+          disabled={notificacaoAtual.lida || marcandoNotificacaoId === notificacaoAtual.id}
           activeOpacity={0.7}
         >
-          <View style={[styles.iconeBox, { backgroundColor: estilo.fundo }]}>
-            {icone}
+          <View style={[styles.iconeBox, { backgroundColor: estiloNotificacao.fundo }]}>
+            {iconeNotificacao}
           </View>
           <View style={styles.info}>
-            <Text style={styles.titulo}>{item.titulo}</Text>
+            <Text style={styles.titulo}>{notificacaoAtual.titulo}</Text>
             <Text style={styles.mensagem} numberOfLines={3}>
-              {item.mensagem}
+              {notificacaoAtual.mensagem}
             </Text>
-            <Text style={styles.tempo}>{formatarTempo(item.criadaEm)}</Text>
+            <Text style={styles.tempo}>{formatarTempoDecorrido(notificacaoAtual.criadaEm)}</Text>
           </View>
-          {!item.lida && <View style={styles.pontoNaoLida} />}
+          {!notificacaoAtual.lida && <View style={styles.pontoNaoLida} />}
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => confirmarExclusao(item.id)}
-          disabled={excluindoId === item.id}
+          onPress={() => confirmarExclusao(notificacaoAtual.id)}
+          disabled={excluindoNotificacaoId === notificacaoAtual.id}
           style={styles.btnExcluir}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
@@ -185,15 +191,15 @@ export default function NotificacoesModal({
               </Text>
             </View>
             <View style={styles.headerBotoes}>
-              {notificacoes.some((n) => !n.lida) && (
+              {notificacoes.some((notificacaoAtual) => !notificacaoAtual.lida) && (
                 <TouchableOpacity
                   style={styles.btnLerTodas}
-                  onPress={lerTodas}
-                  disabled={marcandoTodas}
+                  onPress={marcarTodasComoLidas}
+                  disabled={marcandoTodasNotificacoes}
                 >
                   <CheckCheck size={16} color="#1A9E75" />
                   <Text style={styles.btnLerTodasTexto}>
-                    {marcandoTodas ? 'Marcando...' : 'Ler todas'}
+                    {marcandoTodasNotificacoes ? 'Marcando...' : 'Ler todas'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -225,8 +231,8 @@ export default function NotificacoesModal({
           ) : (
             <FlatList
               data={notificacoes}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
+              keyExtractor={(notificacaoAtual) => notificacaoAtual.id}
+              renderItem={renderizarNotificacao}
               contentContainerStyle={styles.lista}
               showsVerticalScrollIndicator={false}
             />
@@ -315,3 +321,26 @@ const styles = StyleSheet.create({
   vazioTitulo: { fontSize: 17, fontWeight: 'bold', color: '#333', marginTop: 12 },
   vazioTexto: { fontSize: 13, color: '#888', textAlign: 'center', marginTop: 8 },
 });
+
+/*
+ARQUIVO: NotificacoesModal.tsx
+
+Responsabilidade:
+Exibir notificações e controlar ações de leitura e exclusão.
+
+Principais elementos:
+- NotificacoesModal()
+- marcarNotificacaoComoLida()
+- marcarTodasComoLidas()
+- confirmarExclusao()
+- formatarTempoDecorrido()
+
+Fluxo:
+Props da tela -> interação no modal -> callback assíncrono -> atualização de estado/feedback
+
+Conceitos usados:
+- useState para indicar operações em andamento
+- async/await e callbacks
+- Alert para confirmação e mensagens
+- FlatList para renderizar notificações
+*/

@@ -9,8 +9,9 @@ type Props = {
   fechar: () => void;
 };
 
+// Exibe os meses disponíveis e informa à tela qual índice foi selecionado.
+// Recebe a lista de meses e callbacks; não retorna dados diretamente.
 export default function SeletorMesModal({ visivel, meses, mesSelecionado, selecionar, fechar }: Props) {
-  // A tela de relatório manda a lista de meses e recebe o índice escolhido.
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={fechar}>
       <View style={styles.overlay}><View style={styles.container}>
@@ -20,9 +21,9 @@ export default function SeletorMesModal({ visivel, meses, mesSelecionado, seleci
         </View>
         <View style={styles.grid}>
           {/* Os meses ficam em uma grade para ocupar menos espaço. */}
-          {meses.map((mes, indice) => (
-            <TouchableOpacity key={mes} style={[styles.item, indice === mesSelecionado && styles.itemAtivo]} onPress={() => selecionar(indice)}>
-              <Text style={[styles.texto, indice === mesSelecionado && styles.textoAtivo]}>{mes}</Text>
+          {meses.map((nomeMes, indiceMes) => (
+            <TouchableOpacity key={nomeMes} style={[styles.item, indiceMes === mesSelecionado && styles.itemAtivo]} onPress={() => selecionar(indiceMes)}>
+              <Text style={[styles.texto, indiceMes === mesSelecionado && styles.textoAtivo]}>{nomeMes}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -42,3 +43,22 @@ const styles = StyleSheet.create({
   texto: { fontSize: 13, fontWeight: '600', color: '#3A3A3C' },
   textoAtivo: { color: '#FFFFFF' },
 });
+
+/*
+ARQUIVO: SeletorMesModal.tsx
+
+Responsabilidade:
+Permitir selecionar um mês em uma janela modal.
+
+Principais elementos:
+- SeletorMesModal()
+- callback selecionar()
+
+Fluxo:
+Lista de meses recebida -> toque no mês -> índice enviado à tela
+
+Conceitos usados:
+- props tipadas
+- map para montar a grade
+- callback de seleção
+*/

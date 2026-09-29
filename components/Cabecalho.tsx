@@ -13,6 +13,8 @@ type Props = {
   excluir: (id: string) => Promise<ResultadoOperacao>;
 };
 
+// Exibe a identificação do aplicativo e abre o painel de notificações.
+// Recebe notificações, estado de carregamento/erro e ações; não retorna dados.
 export default function Cabecalho({
   notificacoes,
   carregando,
@@ -21,7 +23,7 @@ export default function Cabecalho({
   marcarTodasLidas,
   excluir,
 }: Props) {
-  const naoLidas = notificacoes.filter((item) => !item.lida).length;
+  const notificacoesNaoLidas = notificacoes.filter((notificacaoAtual) => !notificacaoAtual.lida).length;
   const [modalAberto, setModalAberto] = useState(false);
 
   return (
@@ -37,10 +39,10 @@ export default function Cabecalho({
         activeOpacity={0.6}
       >
         <Bell color="#4A5568" size={22} />
-        {naoLidas > 0 && (
+        {notificacoesNaoLidas > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeTexto}>
-              {naoLidas > 9 ? '9+' : naoLidas}
+              {notificacoesNaoLidas > 9 ? '9+' : notificacoesNaoLidas}
             </Text>
           </View>
         )}
@@ -100,3 +102,22 @@ const styles = StyleSheet.create({
   },
   badgeTexto: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 });
+
+/*
+ARQUIVO: Cabecalho.tsx
+
+Responsabilidade:
+Mostrar o cabeçalho do aplicativo e o acesso às notificações.
+
+Principais elementos:
+- Cabecalho()
+- NotificacoesModal
+
+Fluxo:
+Props da tela -> cabeçalho e contador -> abertura do modal de notificações
+
+Conceitos usados:
+- props e callbacks tipados
+- useState
+- filtragem de notificações
+*/

@@ -9,22 +9,24 @@ type Props = {
   tipo: 'receita' | 'despesa';
 };
 
+// Apresenta uma transação com ícone, categoria e valor formatado.
+// Recebe os dados da transação; não retorna dados ao componente pai.
 export default function TransacaoItem({ descricao, categoria, valor, tipo }: Props) {
   // O tipo muda o ícone, a cor e o sinal do valor.
-  const isReceita = tipo === 'receita';
-  const Icone = isReceita ? ArrowUpRight : ArrowDownLeft;
+  const ehReceita = tipo === 'receita';
+  const Icone = ehReceita ? ArrowUpRight : ArrowDownLeft;
 
   return (
     <View style={styles.item}>
-      <View style={[styles.iconeBox, { backgroundColor: isReceita ? '#DCFCE7' : '#FFE4E6' }]}>
-        <Icone size={20} color={isReceita ? '#1a9e75' : '#e53935'} />
+      <View style={[styles.iconeBox, { backgroundColor: ehReceita ? '#DCFCE7' : '#FFE4E6' }]}>
+        <Icone size={20} color={ehReceita ? '#1a9e75' : '#e53935'} />
       </View>
       <View style={styles.info}>
         <Text style={styles.descricao}>{descricao}</Text>
         <Text style={styles.categoria}>{categoria}</Text>
       </View>
-      <Text style={[styles.valor, { color: isReceita ? '#1a9e75' : '#e53935' }]}>
-        {isReceita ? '+' : '-'}R$ {formatarMoeda(valor)}
+      <Text style={[styles.valor, { color: ehReceita ? '#1a9e75' : '#e53935' }]}>
+        {ehReceita ? '+' : '-'}R$ {formatarMoeda(valor)}
       </Text>
     </View>
   );
@@ -53,3 +55,22 @@ const styles = StyleSheet.create({
   categoria: { fontSize: 12, color: '#888' },
   valor: { fontSize: 16, fontWeight: '700' },
 });
+
+/*
+ARQUIVO: TransacaoItem.tsx
+
+Responsabilidade:
+Mostrar uma transação individual com seu tipo, categoria e valor.
+
+Principais elementos:
+- TransacaoItem()
+- formatação do valor monetário
+
+Fluxo:
+Props da transação -> escolha do ícone/sinal -> apresentação formatada
+
+Conceitos usados:
+- props tipadas
+- renderização condicional
+- estilos dinâmicos
+*/

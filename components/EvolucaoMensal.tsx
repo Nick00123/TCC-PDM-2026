@@ -3,8 +3,8 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import { VictoryAxis, VictoryBar, VictoryChart, VictoryGroup, VictoryTheme } from 'victory-native';
 import type { Transacao } from '../types';
 
-const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-               'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+                     'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 const COR_RECEITA = '#1a9e75';
 const COR_DESPESA = '#e24b4a';
@@ -13,6 +13,8 @@ type Props = {
   transacoes: Transacao[];
 };
 
+// Compara as receitas e despesas mensais do ano em um gráfico semestral.
+// Recebe a lista de transações; não retorna dados, apenas renderiza o gráfico.
 export default function EvolucaoMensal({ transacoes }: Props) {
   // Pego a largura da tela para o gráfico não ficar cortado.
   const { width } = useWindowDimensions();
@@ -27,34 +29,34 @@ export default function EvolucaoMensal({ transacoes }: Props) {
   });
 
   // Aqui somo receitas e despesas de cada mês.
-  const dados = MESES.map((label, i) => {
+  const dadosMensais = NOMES_MESES.map((nomeMes, indiceMes) => {
     const receita = transacoesDoAno
-      .filter((t: Transacao) => {
-        const mes = Number(t.data.split('-')[1]) - 1;
-        return t.tipo === 'receita' && mes === i;
+      .filter((transacaoAtual: Transacao) => {
+        const mesDaTransacao = Number(transacaoAtual.data.split('-')[1]) - 1;
+        return transacaoAtual.tipo === 'receita' && mesDaTransacao === indiceMes;
       })
-      .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+      .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
     const despesa = transacoesDoAno
-      .filter((t: Transacao) => {
-        const mes = Number(t.data.split('-')[1]) - 1;
-        return t.tipo === 'despesa' && mes === i;
+      .filter((transacaoAtual: Transacao) => {
+        const mesDaTransacao = Number(transacaoAtual.data.split('-')[1]) - 1;
+        return transacaoAtual.tipo === 'despesa' && mesDaTransacao === indiceMes;
       })
-      .reduce((acc: number, t: Transacao) => acc + t.valor, 0);
+      .reduce((somaValores: number, transacaoAtual: Transacao) => somaValores + transacaoAtual.valor, 0);
 
-    return { x: i + 1, mes: label, receita, despesa };
+    return { x: indiceMes + 1, mes: nomeMes, receita, despesa };
   });
 
   // O botão mostra apenas uma metade do ano por vez.
-  const dadosSemestre = semestre === 1 ? dados.slice(0, 6) : dados.slice(6, 12);
-  const labelsDoSemestre = dadosSemestre.map((d) => d.mes);
+  const dadosSemestre = semestre === 1 ? dadosMensais.slice(0, 6) : dadosMensais.slice(6, 12);
+  const labelsDoSemestre = dadosSemestre.map((dadosDoMes) => dadosDoMes.mes);
 
-  const maxValor = Math.max(
-    ...dadosSemestre.map((d) => Math.max(d.receita, d.despesa)),
+  const valorMaximoGrafico = Math.max(
+    ...dadosSemestre.map((dadosDoMes) => Math.max(dadosDoMes.receita, dadosDoMes.despesa)),
     100
   );
 
-  const formatarEixoY = (valor: number) => {
+  const formatarValorEixoY = (valor: number) => {
     if (valor === 0) return 'R$0';
     if (valor >= 1000) return `R$${(valor / 1000).toFixed(1)}k`;
     return `R$${Math.round(valor)}`;
@@ -102,11 +104,11 @@ export default function EvolucaoMensal({ transacoes }: Props) {
         height={220}
         theme={VictoryTheme.material}
         domainPadding={{ x: 20 }}
-        domain={{ y: [0, maxValor] }}
+        domain={{ y: [0, valorMaximoGrafico] }}
         padding={{ top: 10, bottom: 36, left: 52, right: 16 }}
       >
         <VictoryAxis
-          tickValues={dadosSemestre.map((d) => d.x)}
+          tickValues={dadosSemestre.map((dadosDoMes) => dadosDoMes.x)}
           tickFormat={(_, i) => labelsDoSemestre[i] ?? ''}
           style={{
             axis: { stroke: '#e0e0e0' },
@@ -116,7 +118,7 @@ export default function EvolucaoMensal({ transacoes }: Props) {
         />
         <VictoryAxis
           dependentAxis
-          tickFormat={formatarEixoY}
+          tickFormat={formatarValorEixoY}
           style={{
             axis: { stroke: 'transparent' },
             grid: { stroke: '#f0f0f0', strokeDasharray: '4,4' },
@@ -184,3 +186,24 @@ const styles = StyleSheet.create({
   legendaCor: { width: 10, height: 10, borderRadius: 2 },
   legendaLabel: { fontSize: 12, color: '#888' },
 });
+
+/*
+ARQUIVO: EvolucaoMensal.tsx
+
+Responsabilidade:
+Comparar receitas e despesas por mês e permitir alternar entre semestres.
+
+Principais elementos:
+- EvolucaoMensal()
+- preparação de dadosMensais
+- gráfico Victory
+
+Fluxo:
+Transações -> totais por mês -> seleção do semestre -> gráfico
+
+Conceitos usados:
+- useState
+- filtragem e redução de arrays
+- dimensões responsivas
+- VictoryChart e VictoryBar
+*/

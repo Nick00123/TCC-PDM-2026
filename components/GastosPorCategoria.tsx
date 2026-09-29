@@ -2,12 +2,14 @@ import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { VictoryPie } from 'victory-native';
 import type { Transacao } from '../types';
 
-const CORES = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
+const CORES_CATEGORIAS = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
 
 type Props = {
   transacoes: Transacao[];
 };
 
+// Agrupa despesas por categoria e apresenta os totais em um gráfico de rosca.
+// Recebe transações; não retorna dados, apenas renderiza o gráfico e sua legenda.
 export default function GastosPorCategoria({ transacoes }: Props) {
   // O tamanho muda junto com a largura do celular.
   const { width } = useWindowDimensions();
@@ -16,32 +18,32 @@ export default function GastosPorCategoria({ transacoes }: Props) {
   const tamanhoPie = Math.min(width / 2.4, 170);
 
   // Primeiro junto todas as despesas com o mesmo nome de categoria.
-  const categorias: { [key: string]: number } = {};
+  const gastosPorCategoria: { [key: string]: number } = {};
   transacoes
-    .filter((t: Transacao) => t.tipo === 'despesa')
-    .forEach((t: Transacao) => {
-      categorias[t.categoria] = (categorias[t.categoria] || 0) + t.valor;
+    .filter((transacaoAtual: Transacao) => transacaoAtual.tipo === 'despesa')
+    .forEach((transacaoAtual: Transacao) => {
+      gastosPorCategoria[transacaoAtual.categoria] = (gastosPorCategoria[transacaoAtual.categoria] || 0) + transacaoAtual.valor;
     });
 
   // Esse total serve para calcular a porcentagem de cada fatia.
-  const total = Object.values(categorias).reduce((a, b) => a + b, 0);
+  const totalGastos = Object.values(gastosPorCategoria).reduce((somaValores, valorCategoria) => somaValores + valorCategoria, 0);
 
-  const dados = Object.entries(categorias).map(([nome, valor]) => ({
-    x: nome,
-    y: valor,
+  const dadosGrafico = Object.entries(gastosPorCategoria).map(([nomeCategoria, valorCategoria]) => ({
+    x: nomeCategoria,
+    y: valorCategoria,
   }));
 
-  const listaCategorias = Object.entries(categorias).map(([nome, valor], index) => {
-    const porcentagem = total > 0 ? Math.round((valor / total) * 100) : 0;
+  const categoriasParaLegenda = Object.entries(gastosPorCategoria).map(([nomeCategoria, valorCategoria], indiceCategoria) => {
+    const porcentagem = totalGastos > 0 ? Math.round((valorCategoria / totalGastos) * 100) : 0;
     return {
-      nome,
+      nome: nomeCategoria,
       porcentagem,
-      cor: CORES[index % CORES.length],
+      cor: CORES_CATEGORIAS[indiceCategoria % CORES_CATEGORIAS.length],
     };
   });
 
   // Sem despesas, não tem gráfico para mostrar.
-  if (dados.length === 0) return null;
+  if (dadosGrafico.length === 0) return null;
 
   return (
     <View style={styles.card}>
@@ -50,10 +52,10 @@ export default function GastosPorCategoria({ transacoes }: Props) {
 <View style={styles.containerGrafico}>
         <View style={[styles.pieContainer, { width: tamanhoPie, height: tamanhoPie }]}>
           <VictoryPie
-            data={dados}
+            data={dadosGrafico}
             width={tamanhoPie}
             height={tamanhoPie}
-            colorScale={CORES}
+            colorScale={CORES_CATEGORIAS}
             innerRadius={tamanhoPie * 0.3}
             padding={0}
             labels={() => null}
@@ -61,15 +63,15 @@ export default function GastosPorCategoria({ transacoes }: Props) {
         </View>
 
         <View style={styles.legendaContainer}>
-          {listaCategorias.map((item) => (
-            <View key={item.nome} style={styles.itemLegenda}>
+          {categoriasParaLegenda.map((categoriaAtual) => (
+            <View key={categoriaAtual.nome} style={styles.itemLegenda}>
               <View style={styles.infoEsquerda}>
-                <View style={[styles.indicadorCor, { backgroundColor: item.cor }]} />
+                <View style={[styles.indicadorCor, { backgroundColor: categoriaAtual.cor }]} />
                 <Text style={styles.nomeCategoria} numberOfLines={1}>
-                  {item.nome}
+                  {categoriaAtual.nome}
                 </Text>
               </View>
-              <Text style={styles.porcentagem}>{item.porcentagem}%</Text>
+              <Text style={styles.porcentagem}>{categoriaAtual.porcentagem}%</Text>
             </View>
           ))}
         </View>
@@ -129,3 +131,24 @@ card: {
     marginLeft: 20,
   },
 });
+
+/*
+ARQUIVO: GastosPorCategoria.tsx
+
+Responsabilidade:
+Agrupar despesas por categoria e exibir sua proporção em um gráfico.
+
+Principais elementos:
+- GastosPorCategoria()
+- preparação de dadosGrafico
+- categoriasParaLegenda
+
+Fluxo:
+Transações -> soma por categoria -> porcentagens e cores -> gráfico e legenda
+
+Conceitos usados:
+- filter e forEach
+- Object.entries e Object.values
+- VictoryPie
+- renderização condicional
+*/

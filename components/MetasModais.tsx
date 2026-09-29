@@ -2,6 +2,8 @@ import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'reac
 
 type NovaMetaProps = { visivel: boolean; titulo: string; total: string; salvando: boolean; setTitulo: (valor: string) => void; setTotal: (valor: string) => void; salvar: () => void; fechar: () => void };
 
+// Exibe o formulário para criar uma meta e envia as ações à tela por callbacks.
+// Recebe os campos, estado e callbacks; não retorna os dados digitados.
 export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, setTotal, salvar, fechar }: NovaMetaProps) {
   // Esse modal pega os dados necessários para criar uma meta nova.
   return (
@@ -21,6 +23,8 @@ export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, set
 
 type DepositoProps = { visivel: boolean; valor: string; depositando: boolean; setValor: (valor: string) => void; confirmar: () => void; fechar: () => void };
 
+// Exibe o campo para adicionar um depósito a uma meta já existente.
+// Recebe o valor, estado e callbacks; não retorna os dados digitados.
 export function ModalDeposito({ visivel, valor, depositando, setValor, confirmar, fechar }: DepositoProps) {
   // Esse outro modal serve só para colocar dinheiro em uma meta existente.
   return (
@@ -47,3 +51,23 @@ const styles = StyleSheet.create({
   cancelar: { padding: 12, alignItems: 'center' },
   cancelarTexto: { color: '#888', fontSize: 15 },
 });
+
+/*
+ARQUIVO: MetasModais.tsx
+
+Responsabilidade:
+Reunir os modais usados para criar uma meta e fazer um depósito.
+
+Principais elementos:
+- ModalNovaMeta()
+- ModalDeposito()
+- props tipadas de cada modal
+
+Fluxo:
+Tela fornece valores e callbacks -> modal exibe campos -> ação volta para a tela
+
+Conceitos usados:
+- componentes controlados
+- props e callbacks
+- componente Modal do React Native
+*/

@@ -3,17 +3,19 @@ import { ArrowDownLeft, ArrowUpRight, BarChart2, Target } from 'lucide-react-nat
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const acoes = [
+const acoesRapidas = [
   { label: 'Receita', icone: ArrowDownLeft, cor: '#E6F4EA', corIcone: '#1A9E75', rota: '/transacoes' },
   { label: 'Despesa', icone: ArrowUpRight, cor: '#FCE8E6', corIcone: '#E53935', rota: '/transacoes' },
   { label: 'Relatório', icone: BarChart2, cor: '#F3E8FF', corIcone: '#8E24AA', rota: '/relatorios' },
   { label: 'Metas', icone: Target, cor: '#FEF7E0', corIcone: '#F57F17', rota: '/metas' },
 ];
 
+// Exibe atalhos de navegação para as principais áreas do aplicativo.
+// Não recebe props nem retorna dados; renderiza os botões de ação rápida.
 export default function AcoesRapidas() {
   return (
     <View style={styles.container}>
-      {acoes.map((acao) => {
+      {acoesRapidas.map((acao) => {
         const Icone = acao.icone;
         return (
           <TouchableOpacity
@@ -58,3 +60,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+/*
+ARQUIVO: AcoesRapidas.tsx
+
+Responsabilidade:
+Exibir atalhos para transações, relatórios e metas.
+
+Principais elementos:
+- AcoesRapidas()
+- acoesRapidas
+
+Fluxo:
+Toque em um atalho -> navegação para a rota correspondente
+
+Conceitos usados:
+- componentes React Native
+- map para renderizar uma lista de ações
+- navegação com Expo Router
+*/

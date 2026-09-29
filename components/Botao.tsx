@@ -9,38 +9,40 @@ type BotaoProps = {
   textStyle?: StyleProp<TextStyle>;
 };
 
+// Renderiza um botão reutilizável com texto, cores e estilos configuráveis.
+// Recebe BotaoProps; não retorna dados, apenas o botão interativo.
 const Botao = (props: BotaoProps) => {
-  let title = props.title || "Título";
-  let onPress = props.onPress;
-  let color = props.color || '#73b05f';
-  let textColor = props.textColor || '#000000';
-  let style = props.style;
-  let textStyle = props.textStyle;
+  const tituloBotao = props.title || "Título";
+  const acaoAoPressionar = props.onPress;
+  const corFundo = props.color || '#73b05f';
+  const corTexto = props.textColor || '#000000';
+  const estiloBotao = props.style;
+  const estiloTexto = props.textStyle;
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={acaoAoPressionar}
       style={[
         {
-          backgroundColor: color,
+          backgroundColor: corFundo,
           paddingVertical: 10,
           paddingHorizontal: 30,
           borderRadius: 18,
         },
-        style,
+        estiloBotao,
       ]}
     >
       <Text
         style={[
           {
-            color: textColor,
+            color: corTexto,
             fontWeight: 'bold',
             textAlign: 'center',
           },
-          textStyle,
+          estiloTexto,
         ]}
       >
-        {title}
+        {tituloBotao}
       </Text>
     </Pressable>
   );
@@ -49,3 +51,23 @@ const Botao = (props: BotaoProps) => {
 Botao.displayName = "Botao";
 
 export default Botao;
+
+/*
+ARQUIVO: Botao.tsx
+
+Responsabilidade:
+Fornecer um botão reutilizável com opções de texto, cores e estilos.
+
+Principais elementos:
+- Botao()
+- BotaoProps
+
+Fluxo:
+Props recebidas -> aplicação de valores padrão -> interação pelo onPress
+
+Conceitos usados:
+- props tipadas
+- valores padrão
+- composição de estilos
+- Pressable
+*/

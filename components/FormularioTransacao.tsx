@@ -15,6 +15,8 @@ type Props = {
   salvar: () => void;
 };
 
+// Coleta os campos de uma receita ou despesa e delega o salvamento à tela.
+// Recebe valores, categorias e callbacks por props; não retorna dados do formulário.
 export default function FormularioTransacao({ tipo, valor, descricao, categoria, categorias, salvando, setValor, setDescricao, setCategoria, fechar, salvar }: Props) {
   // O mesmo formulário serve para receita e despesa.
   return (
@@ -32,9 +34,9 @@ export default function FormularioTransacao({ tipo, valor, descricao, categoria,
         <Text style={styles.label}>Categoria</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categorias}>
           {/* Cada categoria vira um botãozinho para selecionar. */}
-          {categorias.map((item) => (
-            <TouchableOpacity key={item} style={[styles.chip, categoria === item && styles.chipAtivo]} onPress={() => setCategoria(item)}>
-              <Text style={[styles.chipTexto, categoria === item && styles.chipTextoAtivo]}>{item}</Text>
+          {categorias.map((categoriaAtual) => (
+            <TouchableOpacity key={categoriaAtual} style={[styles.chip, categoria === categoriaAtual && styles.chipAtivo]} onPress={() => setCategoria(categoriaAtual)}>
+              <Text style={[styles.chipTexto, categoria === categoriaAtual && styles.chipTextoAtivo]}>{categoriaAtual}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -62,3 +64,23 @@ const styles = StyleSheet.create({
   salvar: { padding: 16, borderRadius: 12, alignItems: 'center' },
   salvarTexto: { color: '#fff', fontSize: 15, fontWeight: 'bold' },
 });
+
+/*
+ARQUIVO: FormularioTransacao.tsx
+
+Responsabilidade:
+Exibir os campos para cadastrar uma receita ou despesa.
+
+Principais elementos:
+- FormularioTransacao()
+- seleção de categoria
+- callbacks de edição e salvamento
+
+Fluxo:
+Props controladas pela tela -> edição dos campos -> callback salvar
+
+Conceitos usados:
+- componentes controlados
+- props e funções de callback
+- renderização condicional
+*/

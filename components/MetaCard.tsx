@@ -7,20 +7,22 @@ type Props = {
   total: number;
 };
 
+// Mostra o progresso de uma meta, seus valores atuais e o objetivo total.
+// Recebe o título, o valor atual e o total; não retorna dados para o componente pai.
 export default function MetaCard({ titulo, atual, total }: Props) {
-  // Calculo quanto da meta já foi completado.
-  const pct = total > 0 ? Math.round((atual / total) * 100) : 0;
+  // Calcula a porcentagem concluída, evitando divisão quando o objetivo é zero.
+  const percentualConcluido = total > 0 ? Math.round((atual / total) * 100) : 0;
 
   return (
     <View style={styles.card}>
       <View style={styles.row}>
         <Text style={styles.titulo}>{titulo}</Text>
-        <Text style={styles.pct}>{pct}%</Text>
+        <Text style={styles.pct}>{percentualConcluido}%</Text>
       </View>
 
       <View style={styles.progressoBg}>
         {/* A barra não pode passar de 100% visualmente. */}
-        <View style={[styles.progressoFill, { width: `${Math.min(pct, 100)}%` }]} />
+        <View style={[styles.progressoFill, { width: `${Math.min(percentualConcluido, 100)}%` }]} />
       </View>
 
       <View style={styles.row}>
@@ -61,3 +63,22 @@ const styles = StyleSheet.create({
   progressoFill: { backgroundColor: '#1A9E75', height: 8 },
   valores: { fontSize: 12, color: '#888', marginTop: 6 },
 });
+
+/*
+ARQUIVO: MetaCard.tsx
+
+Responsabilidade:
+Exibir os valores e a porcentagem de progresso de uma meta financeira.
+
+Principais elementos:
+- MetaCard()
+- cálculo de percentualConcluido
+
+Fluxo:
+Props da meta -> cálculo da porcentagem -> apresentação dos valores e da barra
+
+Conceitos usados:
+- props tipadas
+- cálculo condicional
+- estilos dinâmicos
+*/

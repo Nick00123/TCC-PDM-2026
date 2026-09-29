@@ -9,6 +9,8 @@ type Props = {
   despesas: number;
 };
 
+// Apresenta o saldo total e os valores de receitas e despesas recebidos por props.
+// Recebe os três valores financeiros; não retorna dados, apenas a visualização do resumo.
 export default function BalanceCard({ saldo, receitas, despesas }: Props) {
   return (
     <View style={styles.card}>
@@ -92,3 +94,22 @@ caixinhaTextos: { flexDirection: 'column', flexShrink: 1 },
     flexShrink: 1,
   },
 });
+
+/*
+ARQUIVO: BalanceCard.tsx
+
+Responsabilidade:
+Mostrar o saldo total e separar visualmente receitas e despesas.
+
+Principais elementos:
+- BalanceCard()
+- Props: saldo, receitas e despesas
+
+Fluxo:
+Valores recebidos da tela -> formatação monetária -> exibição do resumo
+
+Conceitos usados:
+- props tipadas
+- componentes e estilos React Native
+- função utilitária de formatação
+*/
