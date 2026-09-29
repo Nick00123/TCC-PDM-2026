@@ -1,217 +1,261 @@
 import type { ContextoAnalise, Meta, Notificacao, Transacao } from '../types';
 import { diagnosticarErroJwt, endpointAuth, endpointRest, headersAutenticados, headersPublicos, SUPABASE_URL } from './sessao';
 
-type Headers = Record<string, string>;
-const ESPERA_PADRAO_JWT_MS = 1000;
-const ESPERA_MAXIMA_JWT_MS = 5000;
-const MARGEM_ESPERA_JWT_MS = 250;
+type CabecalhosHttp = Record<string, string>;
+const TEMPO_PADRAO_ESPERA_JWT_EM_MS = 1000;
+const TEMPO_MAXIMO_ESPERA_JWT_EM_MS = 5000;
+const MARGEM_SEGURANCA_ESPERA_JWT_EM_MS = 250;
 
-function erroJwtEmitidoNoFuturo(corpoErro: string) {
+// Verifica se a mensagem da API indica um JWT emitido no futuro.
+// Recebe o corpo de erro em texto e retorna true somente para esse erro específico.
+function identificarErroJwtEmitidoNoFuturo(corpoErro: string): boolean {
   // Esse erro aparece quando o relógio do servidor ainda não chegou no horário do token.
   try {
-    const erro = JSON.parse(corpoErro) as { code?: unknown; message?: unknown };
-    return erro.code === 'PGRST303'
-      && typeof erro.message === 'string'
-      && erro.message.toLowerCase().includes('jwt issued at future');
+    const detalhesErro = JSON.parse(corpoErro) as { code?: unknown; message?: unknown };
+    return detalhesErro.code === 'PGRST303'
+      && typeof detalhesErro.message === 'string'
+      && detalhesErro.message.toLowerCase().includes('jwt issued at future');
   } catch {
     return false;
   }
 }
 
-function aguardar(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+// Aguarda pelo tempo informado antes de continuar uma operação assíncrona.
+// Recebe a duração em milissegundos e resolve a Promise quando o tempo termina.
+function esperarMilissegundos(duracaoEmMs: number): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, duracaoEmMs));
 }
 
-export async function requisicaoRest(caminho: string, opcoes: RequestInit = {}) {
-  // Se o JWT parecer adiantado, espero um pouco e tento a chamada de novo.
-  const executar = () => fetch(endpointRest(caminho), opcoes);
-  const primeiraResposta = await executar();
+// Envia uma requisição REST ao Supabase e trata o erro conhecido de horário do JWT.
+// Recebe o caminho da consulta e as opções nativas do fetch; retorna a Response da API.
+export async function executarRequisicaoRest(urlConsulta: string, opcoesDaRequisicao: RequestInit = {}): Promise<Response> {
+  const tentarRequisicaoRest = () => fetch(endpointRest(urlConsulta), opcoesDaRequisicao);
+  const primeiraResposta = await tentarRequisicaoRest();
 
   if (primeiraResposta.ok) return primeiraResposta;
 
   const corpoErro = await primeiraResposta.clone().text();
-  if (!erroJwtEmitidoNoFuturo(corpoErro)) return primeiraResposta;
+  if (!identificarErroJwtEmitidoNoFuturo(corpoErro)) return primeiraResposta;
 
-  const authorization = new globalThis.Headers(opcoes.headers).get('Authorization') ?? '';
-  const diagnostico = diagnosticarErroJwt(primeiraResposta, corpoErro, authorization);
-  const diferencaServidor = diagnostico?.iatAdiantadoServidorSegundos;
-  const esperaCalculada = diferencaServidor !== null && diferencaServidor !== undefined
-    ? Math.max(500, diferencaServidor * 1000 + MARGEM_ESPERA_JWT_MS)
-    : ESPERA_PADRAO_JWT_MS;
-  const esperaMs = Math.min(ESPERA_MAXIMA_JWT_MS, esperaCalculada);
+  const cabecalhoAuthorization = new globalThis.Headers(opcoesDaRequisicao.headers).get('Authorization') ?? '';
+  const diagnosticoJwt = diagnosticarErroJwt(primeiraResposta, corpoErro, cabecalhoAuthorization);
+  const diferencaHorarioServidorEmSegundos = diagnosticoJwt?.iatAdiantadoServidorSegundos;
+  const tempoDeEsperaCalculadoEmMs = diferencaHorarioServidorEmSegundos !== null && diferencaHorarioServidorEmSegundos !== undefined
+    ? Math.max(500, diferencaHorarioServidorEmSegundos * 1000 + MARGEM_SEGURANCA_ESPERA_JWT_EM_MS)
+    : TEMPO_PADRAO_ESPERA_JWT_EM_MS;
+  const tempoDeEsperaEmMs = Math.min(TEMPO_MAXIMO_ESPERA_JWT_EM_MS, tempoDeEsperaCalculadoEmMs);
 
-  console.warn(`JWT diagnóstico: nova tentativa REST em ${Math.round(esperaMs)} ms.`);
-  await aguardar(esperaMs);
-  return executar();
+  console.warn(`JWT diagnóstico: nova tentativa REST em ${Math.round(tempoDeEsperaEmMs)} ms.`);
+  // Se o JWT foi emitido no futuro segundo o servidor, aguarda e repete a mesma requisição.
+  await esperarMilissegundos(tempoDeEsperaEmMs);
+  return tentarRequisicaoRest();
 }
 
-async function lerResposta(resposta: Response) {
-  if (!resposta.ok) {
-    throw new Error(await resposta.text());
+// Valida uma resposta HTTP e lança o erro original quando a API indica falha.
+// Recebe uma Response e retorna a mesma resposta quando a chamada foi bem-sucedida.
+async function validarRespostaDaApi(respostaDaApi: Response): Promise<Response> {
+  if (!respostaDaApi.ok) {
+    throw new Error(await respostaDaApi.text());
   }
 
-  return resposta;
+  return respostaDaApi;
 }
 
-async function lerAlteracaoComRegistro(resposta: Response) {
-  // DELETE e PATCH precisam devolver algum registro para eu saber que funcionaram.
-  await lerResposta(resposta);
-  const registros = await resposta.json();
-  if (!Array.isArray(registros) || registros.length === 0) {
+// Confirma uma alteração que deve retornar os registros afetados pelo Supabase.
+// Recebe a Response e não retorna valor; lança erro se nenhum registro for alterado.
+async function validarAlteracaoComRegistro(respostaDaApi: Response): Promise<void> {
+  // DELETE e PATCH precisam devolver algum registro para confirmar que funcionaram.
+  await validarRespostaDaApi(respostaDaApi);
+  const registrosAlterados = await respostaDaApi.json();
+  if (!Array.isArray(registrosAlterados) || registrosAlterados.length === 0) {
     throw new Error('Nenhum registro foi alterado.');
   }
 }
 
-export async function buscarTransacoes(usuarioId: string, headers: Headers): Promise<Transacao[]> {
+// Busca e converte as transações do usuário para o tipo usado pelo aplicativo.
+// Recebe o identificador do usuário e os cabeçalhos; retorna uma lista de Transacao.
+export async function buscarTransacoes(usuarioId: string, cabecalhos: CabecalhosHttp): Promise<Transacao[]> {
   // O usuario_id no filtro evita misturar dados de contas diferentes.
-  const caminho = `transacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=data.desc`;
-  const resposta = await lerResposta(await requisicaoRest(caminho, { headers }));
-  const lista = await resposta.json();
+  const urlConsulta = `transacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=data.desc`;
+  const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(urlConsulta, { headers: cabecalhos }));
+  const transacoesRecebidas = await respostaDaApi.json();
 
-  return lista.map((item: any): Transacao => ({
-    id: item.id,
-    descricao: item.descricao,
-    categoria: item.categoria,
-    valor: Number(item.valor),
-    data: item.data,
-    tipo: item.tipo,
+  // Converte cada registro recebido para o formato definido no tipo Transacao.
+  return transacoesRecebidas.map((registroDaTransacao: any): Transacao => ({
+    id: registroDaTransacao.id,
+    descricao: registroDaTransacao.descricao,
+    categoria: registroDaTransacao.categoria,
+    valor: Number(registroDaTransacao.valor),
+    data: registroDaTransacao.data,
+    tipo: registroDaTransacao.tipo,
   }));
 }
 
-export async function criarTransacao(usuarioId: string, nova: Omit<Transacao, 'id'>, headers: Headers) {
-  await lerResposta(await requisicaoRest('transacoes', {
+// Envia uma nova transação para o Supabase, vinculada ao usuário informado.
+// Recebe os dados sem id e os cabeçalhos; não retorna conteúdo para a tela.
+export async function criarTransacao(usuarioId: string, novaTransacao: Omit<Transacao, 'id'>, cabecalhos: CabecalhosHttp): Promise<void> {
+  await validarRespostaDaApi(await executarRequisicaoRest('transacoes', {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ usuario_id: usuarioId, ...nova }),
+    headers: cabecalhos,
+    body: JSON.stringify({ usuario_id: usuarioId, ...novaTransacao }),
   }));
 }
 
-export async function excluirTransacao(usuarioId: string, id: string, headers: Headers) {
-  const caminho = `transacoes?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
-  await lerAlteracaoComRegistro(await requisicaoRest(caminho, {
+// Exclui uma transação somente se ela pertencer ao usuário informado.
+// Recebe os identificadores e cabeçalhos; confirma a exclusão ou lança um erro.
+export async function excluirTransacao(usuarioId: string, transacaoId: string, cabecalhos: CabecalhosHttp): Promise<void> {
+  const urlConsulta = `transacoes?id=eq.${encodeURIComponent(transacaoId)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
+  await validarAlteracaoComRegistro(await executarRequisicaoRest(urlConsulta, {
     method: 'DELETE',
-    headers: { ...headers, Prefer: 'return=representation' },
+    headers: { ...cabecalhos, Prefer: 'return=representation' },
   }));
 }
 
-export async function buscarMetas(usuarioId: string, headers: Headers): Promise<Meta[]> {
-  const caminho = `metas?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`;
-  const resposta = await lerResposta(await requisicaoRest(caminho, { headers }));
-  const lista = await resposta.json();
+// Busca e converte as metas do usuário para o tipo usado nas telas.
+// Recebe o identificador do usuário e os cabeçalhos; retorna uma lista de Meta.
+export async function buscarMetas(usuarioId: string, cabecalhos: CabecalhosHttp): Promise<Meta[]> {
+  const urlConsulta = `metas?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=created_at.desc`;
+  const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(urlConsulta, { headers: cabecalhos }));
+  const metasRecebidas = await respostaDaApi.json();
 
-  return lista.map((item: any): Meta => ({
-    id: item.id,
-    titulo: item.titulo,
-    atual: Number(item.valor_atual),
-    total: Number(item.valor_objetivo),
+  // O map percorre os registros e adapta nomes/valores ao tipo Meta do app.
+  return metasRecebidas.map((registroDaMeta: any): Meta => ({
+    id: registroDaMeta.id,
+    titulo: registroDaMeta.titulo,
+    atual: Number(registroDaMeta.valor_atual),
+    total: Number(registroDaMeta.valor_objetivo),
   }));
 }
 
-export async function criarMeta(usuarioId: string, titulo: string, total: number, headers: Headers) {
-  await lerResposta(await requisicaoRest('metas', {
+// Cria uma meta com progresso inicial igual a zero.
+// Recebe o usuário, título, objetivo e cabeçalhos; não retorna conteúdo.
+export async function criarMeta(usuarioId: string, titulo: string, total: number, cabecalhos: CabecalhosHttp): Promise<void> {
+  await validarRespostaDaApi(await executarRequisicaoRest('metas', {
     method: 'POST',
-    headers,
+    headers: cabecalhos,
     body: JSON.stringify({ usuario_id: usuarioId, titulo, valor_objetivo: total, valor_atual: 0 }),
   }));
 }
 
-export async function excluirMeta(usuarioId: string, id: string, headers: Headers) {
-  const caminho = `metas?id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
-  await lerAlteracaoComRegistro(await requisicaoRest(caminho, {
+// Exclui a meta indicada, garantindo que ela pertença ao usuário informado.
+// Recebe os identificadores e cabeçalhos; confirma a exclusão ou lança um erro.
+export async function excluirMeta(usuarioId: string, metaId: string, cabecalhos: CabecalhosHttp): Promise<void> {
+  const urlConsulta = `metas?id=eq.${encodeURIComponent(metaId)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
+  await validarAlteracaoComRegistro(await executarRequisicaoRest(urlConsulta, {
     method: 'DELETE',
-    headers: { ...headers, Prefer: 'return=representation' },
+    headers: { ...cabecalhos, Prefer: 'return=representation' },
   }));
 }
 
-export async function consultarValoresMeta(usuarioId: string, id: string, headers: Headers) {
-  const filtro = `id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
-  const resposta = await lerResposta(await requisicaoRest(`metas?select=valor_atual,valor_objetivo&${filtro}`, { headers }));
-  const registros = await resposta.json();
-  return registros[0] ?? null;
+// Consulta os valores atuais e o objetivo da meta para preparar uma atualização.
+// Recebe o usuário, a meta e os cabeçalhos; retorna o primeiro registro ou null.
+export async function consultarValoresAtuaisDaMeta(usuarioId: string, metaId: string, cabecalhos: CabecalhosHttp) {
+  const filtroConsulta = `id=eq.${encodeURIComponent(metaId)}&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
+  const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(`metas?select=valor_atual,valor_objetivo&${filtroConsulta}`, { headers: cabecalhos }));
+  const registrosRecebidos = await respostaDaApi.json();
+  return registrosRecebidos[0] ?? null;
 }
 
-export async function atualizarValorMeta(usuarioId: string, id: string, valorAnterior: number, novoValor: number, headers: Headers) {
-  // Também confiro o valor anterior para não sobrescrever uma mudança recente.
-  const filtro = `id=eq.${encodeURIComponent(id)}&usuario_id=eq.${encodeURIComponent(usuarioId)}&valor_atual=eq.${encodeURIComponent(valorAnterior)}`;
-  await lerAlteracaoComRegistro(await requisicaoRest(`metas?${filtro}`, {
+// Atualiza o progresso usando o valor anterior como proteção contra sobrescrita.
+// Recebe usuário, meta, valores antigo/novo e cabeçalhos; confirma o registro alterado.
+export async function atualizarProgressoDaMeta(usuarioId: string, metaId: string, valorAnterior: number, novoValor: number, cabecalhos: CabecalhosHttp): Promise<void> {
+  // O filtro pelo valor anterior evita sobrescrever uma alteração mais recente.
+  const filtroConsulta = `id=eq.${encodeURIComponent(metaId)}&usuario_id=eq.${encodeURIComponent(usuarioId)}&valor_atual=eq.${encodeURIComponent(valorAnterior)}`;
+  await validarAlteracaoComRegistro(await executarRequisicaoRest(`metas?${filtroConsulta}`, {
     method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=representation' },
+    headers: { ...cabecalhos, Prefer: 'return=representation' },
     body: JSON.stringify({ valor_atual: novoValor }),
   }));
 }
 
-export async function buscarNotificacoes(usuarioId: string, headers: Headers) {
-  const caminho = `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`;
-  const resposta = await lerResposta(await requisicaoRest(caminho, { headers }));
-  const lista = await resposta.json();
+// Busca até 50 notificações do usuário e converte os registros para Notificacao.
+// Recebe o identificador do usuário e os cabeçalhos; retorna a lista encontrada.
+export async function buscarNotificacoes(usuarioId: string, cabecalhos: CabecalhosHttp): Promise<Notificacao[]> {
+  const urlConsulta = `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`;
+  const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(urlConsulta, { headers: cabecalhos }));
+  const notificacoesRecebidas = await respostaDaApi.json();
 
-  return lista.map((item: any): Notificacao => ({
-    id: item.id,
-    titulo: item.titulo,
-    mensagem: item.mensagem,
-    tipo: item.tipo,
-    lida: item.lida,
-    criadaEm: item.criada_em,
+  return notificacoesRecebidas.map((registroDaNotificacao: any): Notificacao => ({
+    id: registroDaNotificacao.id,
+    titulo: registroDaNotificacao.titulo,
+    mensagem: registroDaNotificacao.mensagem,
+    tipo: registroDaNotificacao.tipo,
+    lida: registroDaNotificacao.lida,
+    criadaEm: registroDaNotificacao.criada_em,
   }));
 }
 
-export async function criarNotificacao(registro: object, headers: Headers) {
-  await lerResposta(await requisicaoRest('notificacoes?on_conflict=usuario_id,chave_evento', {
+// Envia uma notificação; conflitos de evento repetido são ignorados pela API.
+// Recebe o objeto com os dados da notificação e cabeçalhos; não retorna conteúdo.
+export async function criarNotificacao(dadosDaNotificacao: object, cabecalhos: CabecalhosHttp): Promise<void> {
+  await validarRespostaDaApi(await executarRequisicaoRest('notificacoes?on_conflict=usuario_id,chave_evento', {
     method: 'POST',
-    headers: { ...headers, Prefer: 'resolution=ignore-duplicates,return=minimal' },
-    body: JSON.stringify(registro),
+    headers: { ...cabecalhos, Prefer: 'resolution=ignore-duplicates,return=minimal' },
+    body: JSON.stringify(dadosDaNotificacao),
   }));
 }
 
-export async function alterarNotificacoes(caminho: string, metodo: 'PATCH' | 'DELETE', headers: Headers) {
-  await lerAlteracaoComRegistro(await requisicaoRest(caminho, {
-    method: metodo,
-    headers: { ...headers, Prefer: 'return=representation' },
-    body: metodo === 'PATCH' ? JSON.stringify({ lida: true }) : undefined,
+// Atualiza ou exclui notificações conforme o método HTTP informado.
+// Recebe o caminho, PATCH/DELETE e cabeçalhos; confirma o registro afetado.
+export async function alterarNotificacoes(urlConsulta: string, metodoHttp: 'PATCH' | 'DELETE', cabecalhos: CabecalhosHttp): Promise<void> {
+  await validarAlteracaoComRegistro(await executarRequisicaoRest(urlConsulta, {
+    method: metodoHttp,
+    headers: { ...cabecalhos, Prefer: 'return=representation' },
+    body: metodoHttp === 'PATCH' ? JSON.stringify({ lida: true }) : undefined,
   }));
 }
 
-export async function buscarResumo(usuarioId: string, headers: Headers) {
-  const caminho = `transacoes?select=valor,tipo&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
-  const resposta = await lerResposta(await requisicaoRest(caminho, { headers }));
-  return resposta.json();
+// Busca os valores e tipos das transações usados no resumo financeiro.
+// Recebe o usuário e cabeçalhos; retorna o JSON da API sem transformar seus campos.
+export async function buscarResumoFinanceiroUsuario(usuarioId: string, cabecalhos: CabecalhosHttp) {
+  const urlConsulta = `transacoes?select=valor,tipo&usuario_id=eq.${encodeURIComponent(usuarioId)}`;
+  const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(urlConsulta, { headers: cabecalhos }));
+  return respostaDaApi.json();
 }
 
-export async function enviarFeedback(usuarioId: string, mensagem: string, categoria: string, headers: Headers) {
-  await lerResposta(await requisicaoRest('feedback', {
+// Registra o feedback enviado pelo usuário.
+// Recebe usuário, mensagem, categoria e cabeçalhos; não retorna conteúdo.
+export async function enviarFeedback(usuarioId: string, mensagem: string, categoria: string, cabecalhos: CabecalhosHttp): Promise<void> {
+  await validarRespostaDaApi(await executarRequisicaoRest('feedback', {
     method: 'POST',
-    headers,
+    headers: cabecalhos,
     body: JSON.stringify({ usuario_id: usuarioId, mensagem, categoria }),
   }));
 }
 
-export async function enviarAutenticacao(caminho: string, dados: object) {
-  const resposta = await fetch(endpointAuth(caminho), {
+// Envia dados para um fluxo de autenticação e normaliza a resposta em JSON.
+// Recebe o caminho de autenticação e o payload; retorna { ok, corpo } para a tela.
+export async function enviarAutenticacao(urlConsulta: string, dadosDaRequisicao: object) {
+  const respostaDaApi = await fetch(endpointAuth(urlConsulta), {
     method: 'POST',
     headers: headersPublicos(),
-    body: JSON.stringify(dados),
+    body: JSON.stringify(dadosDaRequisicao),
   });
-  const texto = await resposta.text();
-  let corpo: any = {};
-  if (texto) {
+  const textoRecebido = await respostaDaApi.text();
+  let corpoDaResposta: any = {};
+  if (textoRecebido) {
     try {
-      corpo = JSON.parse(texto);
+      corpoDaResposta = JSON.parse(textoRecebido);
     } catch {
-      corpo = { message: texto };
+      corpoDaResposta = { message: textoRecebido };
     }
   }
-  return { ok: resposta.ok, corpo };
+  return { ok: respostaDaApi.ok, corpo: corpoDaResposta };
 }
 
-export async function salvarPerfil(usuarioId: string, nome: string, headers: Headers) {
-  return requisicaoRest('perfis?on_conflict=id', {
+// Cria ou atualiza o perfil associado ao usuário, mesclando conflitos de id.
+// Recebe o usuário, nome e cabeçalhos; retorna a Response da requisição REST.
+export async function salvarOuAtualizarPerfilUsuario(usuarioId: string, nome: string, cabecalhos: CabecalhosHttp): Promise<Response> {
+  return executarRequisicaoRest('perfis?on_conflict=id', {
     method: 'POST',
-    headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+    headers: { ...cabecalhos, Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ id: usuarioId, nome }),
   });
 }
 
-export async function pedirAnalise(contexto: ContextoAnalise): Promise<string> {
+// Solicita uma análise educativa à Edge Function com os dados financeiros atuais.
+// Recebe o contexto tipado e retorna o texto da análise; falhas de rede/API são lançadas.
+export async function solicitarAnaliseFinanceiraDaIA(contexto: ContextoAnalise): Promise<string> {
   // O prompt limita a resposta para ela ficar curta e útil dentro do app.
   const prompt = `
 Você é um mentor financeiro educativo, empático e objetivo do app EduFinance.
@@ -231,9 +275,9 @@ ${JSON.stringify(contexto)}
 
   const controlador = new AbortController();
   const limite = setTimeout(() => controlador.abort(), 30_000);
-  let resposta: Response;
+  let respostaDaApi: Response;
   try {
-    resposta = await fetch(`${SUPABASE_URL}/functions/v1/bright-endpoint`, {
+    respostaDaApi = await fetch(`${SUPABASE_URL}/functions/v1/bright-endpoint`, {
       method: 'POST',
       headers: await headersAutenticados(),
       body: JSON.stringify({ prompt, contexto }),
@@ -243,14 +287,39 @@ ${JSON.stringify(contexto)}
     clearTimeout(limite);
   }
 
-  if (!resposta.ok) {
-    throw new Error(`Falha ao analisar dados (${resposta.status}).`);
+  if (!respostaDaApi.ok) {
+    throw new Error(`Falha ao analisar dados (${respostaDaApi.status}).`);
   }
 
-  const corpo = (await resposta.json()) as { resposta?: unknown };
-  if (typeof corpo.resposta !== 'string' || !corpo.resposta.trim()) {
+  const corpoDaResposta = (await respostaDaApi.json()) as { resposta?: unknown };
+  if (typeof corpoDaResposta.resposta !== 'string' || !corpoDaResposta.resposta.trim()) {
     throw new Error('A Edge Function retornou uma análise inválida.');
   }
 
-  return corpo.resposta.trim();
+  return corpoDaResposta.resposta.trim();
 }
+
+/*
+ARQUIVO: requisicoes.ts
+
+Responsabilidade:
+Centralizar a comunicação do aplicativo com o Supabase.
+
+Principais funções:
+- buscarTransacoes()
+- criarTransacao()
+- buscarMetas()
+- criarMeta()
+- solicitarAnaliseFinanceiraDaIA()
+
+Fluxo:
+Tela -> requisicoes.ts -> Supabase -> Retorno para Tela
+
+Conceitos usados:
+- async/await
+- fetch
+- REST API
+- JSON
+- Promise
+- TypeScript
+*/

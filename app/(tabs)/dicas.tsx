@@ -3,12 +3,12 @@ import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, Tren
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Dica, Meta, Transacao, Video } from '../../types';
-import { buscarMetas, buscarTransacoes, pedirAnalise, requisicaoRest } from '../../utils/requisicoes';
+import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 async function buscarDicas(): Promise<Dica[]> {
   // As dicas ficam salvas no banco para poderem ser atualizadas sem mudar o app.
-  const resposta = await requisicaoRest('dicas?select=*&order=created_at.desc', {
+  const resposta = await executarRequisicaoRest('dicas?select=*&order=created_at.desc', {
     headers: await headersAutenticados(),
   });
 
@@ -159,7 +159,7 @@ export default function Dicas() {
         categoria,
       }));
 
-      setAnalise(await pedirAnalise({ receitas, despesas, metas: metasAtivas, dicasDisponiveis }));
+      setAnalise(await solicitarAnaliseFinanceiraDaIA({ receitas, despesas, metas: metasAtivas, dicasDisponiveis }));
     } catch (error) {
       console.error(error);
       setErroAnalise('Não foi possível gerar sua análise agora. Toque em atualizar para tentar novamente.');

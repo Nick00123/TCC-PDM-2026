@@ -15,7 +15,7 @@ import {
     View,
 } from 'react-native';
 import Botao from '../components/Botao';
-import { enviarAutenticacao, salvarPerfil } from '../utils/requisicoes';
+import { enviarAutenticacao, salvarOuAtualizarPerfilUsuario } from '../utils/requisicoes';
 import {
     criarSessao,
     headersAutenticados,
@@ -104,7 +104,7 @@ export default function App() {
 
       if (aba === 'criar') {
         // Depois de criar a conta, salvo também o nome do perfil.
-        const perfilResposta = await salvarPerfil(
+        const perfilResposta = await salvarOuAtualizarPerfilUsuario(
           sessao.user.id,
           nome.trim(),
           await headersAutenticados()

@@ -5,7 +5,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { ModalDeposito, ModalNovaMeta } from '../../components/MetasModais';
 import type { Meta } from '../../types';
 import { formatarMoeda } from '../../utils/formatacao';
-import { atualizarValorMeta, buscarMetas, consultarValoresMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
+import { atualizarProgressoDaMeta, buscarMetas, consultarValoresAtuaisDaMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 export default function Metas() {
@@ -65,12 +65,12 @@ export default function Metas() {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
     const headers = await headersAutenticados();
-    const registro = await consultarValoresMeta(usuario.id, id, headers);
+    const registro = await consultarValoresAtuaisDaMeta(usuario.id, id, headers);
     if (!registro) return { sucesso: false, mensagem: 'Não foi possível consultar a meta.' };
     const valorAnterior = Number(registro.valor_atual);
     // Busco o valor de novo para não apagar uma alteração feita em outro lugar.
     const novoValor = valorAnterior + valor;
-    await atualizarValorMeta(usuario.id, id, valorAnterior, novoValor, headers);
+    await atualizarProgressoDaMeta(usuario.id, id, valorAnterior, novoValor, headers);
     await carregarMetas();
     return { sucesso: true, mensagem: '' };
   }

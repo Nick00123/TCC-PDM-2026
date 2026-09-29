@@ -18,7 +18,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { CategoriaFeedback, OpcaoFeedback, Usuario } from '../../types';
 import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
-import { buscarMetas, buscarResumo, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import { buscarMetas, buscarResumoFinanceiroUsuario, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
 import {
     carregarSessao,
     endpointAuth,
@@ -63,7 +63,7 @@ export default function Perfil() {
         nome: dadosUsuario.user_metadata?.nome || dadosUsuario.email?.split('@')[0] || '',
         email: dadosUsuario.email || '',
       });
-      const lista = await buscarResumo(dadosUsuario.id, await headersAutenticados());
+      const lista = await buscarResumoFinanceiroUsuario(dadosUsuario.id, await headersAutenticados());
       setTotalReceitas(
         lista
           .filter((item: any) => item.tipo === 'receita')
