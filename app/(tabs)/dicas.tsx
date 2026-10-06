@@ -3,7 +3,7 @@ import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, Tren
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Dica, Meta, Transacao, Video } from '../../types';
-import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA } from '../../utils/requisicoes';
+import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA, buscarVideos } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 // Busca as dicas cadastradas no Supabase para alimentar a central de aprendizado.
@@ -21,6 +21,7 @@ async function buscarDicas(): Promise<Dica[]> {
 
   return (await respostaDaApi.json()) as Dica[];
 }
+
 
 // Escolhe o componente de ícone correspondente à categoria da dica.
 // Recebe a categoria e o tamanho; retorna o ícone associado.
@@ -45,40 +46,7 @@ const obterMiniaturaDoYoutube = (urlVideo: string) => {
   return correspondenciaVideo ? `https://img.youtube.com/vi/${correspondenciaVideo[1]}/hqdefault.jpg` : undefined;
 };
 
-const VIDEOS: Video[] = [
-  {
-    id: '1',
-    titulo: 'COMO ORGANIZAR SUAS FINANÇAS E GUARDAR DINHEIRO | Planejamento financeiro FÁCIL',
-    canal: 'O Primo Rico',
-    duracao: '17 min',
-    categoria: 'Orçamento',
-    url: 'https://www.youtube.com/watch?v=in0XbfQEm2A',
-  },
-  {
-    id: '2',
-    titulo: 'EduFinance: Regra 50-30-20',
-    canal: 'TCC-teste',
-    duracao: '7 min',
-    categoria: 'Planejamento',
-    url: 'https://youtu.be/aMgegLLLY9A',
-  },
-  {
-    id: '3',
-    titulo: 'Tesouro Direto para iniciantes: do Selic ao Renda+! Como investir?',
-    canal: 'Me Poupe!',
-    duracao: '12 min',
-    categoria: 'Investimento',
-    url: 'https://www.youtube.com/watch?v=y2sBkIX72-g',
-  },
-  {
-    id: '4',
-    titulo: 'Como sair das DIVIDAS! (com sacrifícios e dicas REAIS...)',
-    canal: 'O Primo Rico',
-    duracao: '13 min',
-    categoria: 'Dívidas',
-    url: 'https://www.youtube.com/watch?v=8zj0GJKTWwE',
-  },
-];
+
 
 const CORES_CATEGORIA: { [key: string]: string } = {
   Educação: '#E3F2FD',
@@ -110,9 +78,21 @@ export default function Dicas() {
   const [busca, setBusca] = useState('');
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
+  const [videos, setVideos] = useState<Video[]>([]);
+const [erroVideos, setErroVideos] = useState<string | null>(null);
 
   const carregamentoDaTelaEmAndamento = useRef(false);
   const ultimoCarregamento = useRef(0);
+
+const carregarVideos = useCallback(async () => {
+  try {
+    setVideos(await buscarVideos(await headersAutenticados()));
+    setErroVideos(null);
+  } catch (detalhesErro) {
+    console.error(detalhesErro);
+    setErroVideos('Não foi possível carregar os vídeos.');
+  }
+}, []);
 
   // Evita chamadas simultâneas e reutiliza os dados até o intervalo de cache expirar.
   const carregarConteudoDaTela = useCallback(async (forcar = false) => {
@@ -124,6 +104,8 @@ export default function Dicas() {
     setCarregandoAnalise(true);
     setErroDicas(null);
     setErroAnalise(null);
+
+    void carregarVideos();
 
     let dicasRecebidas: Dica[];
     try {
@@ -181,7 +163,7 @@ export default function Dicas() {
       carregamentoDaTelaEmAndamento.current = false;
       ultimoCarregamento.current = Date.now();
     }
-  }, []);
+  }, [carregarVideos]);
 
   // Recarrega os dados toda vez que a tela entra em foco no Expo Router
   useFocusEffect(
@@ -295,9 +277,10 @@ export default function Dicas() {
 
       {/* Seção de vídeos */}
       <Text style={styles.secaoTitulo}>Aprenda com Vídeos</Text>
+      {erroVideos && <Text style={styles.erroLista}>{erroVideos}</Text>}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
-        {VIDEOS.map((videoAtual) => (
+        {videos.map((videoAtual) => (
           <TouchableOpacity
             key={videoAtual.id}
             style={styles.videoCard}

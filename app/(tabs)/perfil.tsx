@@ -10,15 +10,14 @@ import {
     Lightbulb,
     LogOut,
     Send,
-    Shield,
     Star,
-    Target,
+    X,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { CategoriaFeedback, OpcaoFeedback, Usuario } from '../../types';
+import { Alert, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import type { CategoriaFeedback, OpcaoFeedback, Usuario, TermoDeUso } from '../../types';
 import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
-import { buscarMetas, buscarResumoFinanceiroUsuario, buscarTransacoes, criarNotificacao, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import { buscarMetas, buscarResumoFinanceiroUsuario, buscarTransacoes, criarNotificacao, buscarTermosDeUso , enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
 import {
     carregarSessao,
     endpointAuth,
@@ -34,6 +33,8 @@ const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
   { chave: 'elogio', icone: Star, label: 'Elogio' },
 ];
 
+
+
 // Exibe os dados da conta, resumo financeiro, suporte e ações do perfil.
 // Carrega dados da sessão e executa ações de feedback, PDF e encerramento.
 export default function Perfil() {
@@ -42,14 +43,19 @@ export default function Perfil() {
   const [totalDespesas, setTotalDespesas] = useState(0);
   const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
   const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
-  const [temaEscuro, setTemaEscuro] = useState(false);
+
   const [feedback, setFeedback] = useState('');
   const [categoriaFeedback, setCategoriaFeedback] = useState<CategoriaFeedback>('sugestao');
   const [enviandoFeedback, setEnviandoFeedback] = useState(false);
   const [feedbackEnviado, setFeedbackEnviado] = useState(false);
   const [saindo, setSaindo] = useState(false);
   const [gerandoPdf, setGerandoPdf] = useState(false);
+  const [termosVisiveis, setTermosVisiveis] = useState(false);
   const router = useRouter();
+
+  const [termos, setTermos] = useState<TermoDeUso[]>([]);
+  const [carregandoTermos, setCarregandoTermos] = useState(false);
+  const [erroTermos, setErroTermos] = useState<string | null>(null);
 
   // Busca o usuário autenticado e soma suas receitas e despesas.
   const carregarDadosDoPerfil = useCallback(async () => {
@@ -173,6 +179,23 @@ export default function Perfil() {
     }
   }
 
+  async function abrirTermos() {
+  setTermosVisiveis(true);
+  // Se já carregou antes (ou está carregando), não busca de novo.
+  if (termos.length > 0 || carregandoTermos) return;
+
+  setCarregandoTermos(true);
+  setErroTermos(null);
+  try {
+    setTermos(await buscarTermosDeUso(await headersAutenticados()));
+  } catch (detalhesErro) {
+    console.error(detalhesErro);
+    setErroTermos('Não foi possível carregar os termos agora. Feche e tente novamente.');
+  } finally {
+    setCarregandoTermos(false);
+  }
+}
+
   // Valida e envia a mensagem de feedback associada ao usuário autenticado.
   const enviarFeedbackDoUsuario = async () => {
     // Não envio mensagem vazia nem deixo clicar duas vezes durante o envio.
@@ -211,24 +234,14 @@ export default function Perfil() {
     }
   };
 
-  // Escolho as cores da tela conforme o tema marcado.
-  const coresTema = temaEscuro
-    ? {
-        container: { backgroundColor: '#0F172A' },
-        sectionBg: '#1E293B',
-        card: '#1E293B',
-        text: '#F8FAFC',
-        subText: '#CBD5E1',
-        border: '#334155',
-      }
-    : {
-        container: { backgroundColor: '#F5F5F5' },
-        sectionBg: '#fff',
-        card: '#fff',
-        text: '#222',
-        subText: '#888',
-        border: '#F5F5F5',
-      };
+  const coresTema = {
+    container: { backgroundColor: '#F5F5F5' },
+    sectionBg: '#fff',
+    card: '#fff',
+    text: '#222',
+    subText: '#888',
+    border: '#F5F5F5',
+  };
 
   return (
     <ScrollView style={[styles.container, coresTema.container]}>
@@ -269,21 +282,6 @@ export default function Perfil() {
       {/* Configurações */}
       <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>CONFIGURAÇÕES</Text>
       <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
-        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
-          <View style={styles.itemEsquerda}>
-            <Target size={20} color="#1A9E75" />
-            <View>
-              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Aparência / Tema</Text>
-              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Alternar entre Modo Claro e Modo Escuro</Text>
-            </View>
-          </View>
-          <Switch
-            value={temaEscuro}
-            onValueChange={(value) => setTemaEscuro(value)}
-            trackColor={{ true: '#1A9E75' }}
-          />
-        </View>
-
         <TouchableOpacity
           style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}
           onPress={gerarRelatorioPdf}
@@ -301,7 +299,12 @@ export default function Perfil() {
           <ChevronRight size={18} color="#ccc" />
         </TouchableOpacity>
 
-        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
+        <TouchableOpacity
+          style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}
+          onPress={abrirTermos}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir termos de uso e política de privacidade"
+        >
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
             <View>
@@ -310,17 +313,7 @@ export default function Perfil() {
             </View>
           </View>
           <ChevronRight size={18} color="#ccc" />
-        </View>
-
-        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
-          <View style={styles.itemEsquerda}>
-            <Shield size={20} color="#1A9E75" />
-            <View>
-              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Backup na Nuvem</Text>
-              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Status da última sincronização dos dados</Text>
-            </View>
-          </View>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Ajuda e suporte */}
@@ -453,6 +446,52 @@ export default function Perfil() {
         <LogOut size={18} color="#F44336" />
         <Text style={styles.btnSairTexto}>{saindo ? 'Saindo...' : 'Sair da Conta'}</Text>
       </TouchableOpacity>
+
+      <Modal
+        visible={termosVisiveis}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTermosVisiveis(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>Termos de Uso e Política de Privacidade</Text>
+              <TouchableOpacity
+                onPress={() => setTermosVisiveis(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar termos de uso"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <X size={22} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.modalConteudo}
+              showsVerticalScrollIndicator
+              contentContainerStyle={styles.modalConteudoInterno}
+            >
+              {carregandoTermos && <ActivityIndicator color="#1A9E75" style={{ marginVertical: 24 }} />}
+              {!carregandoTermos && erroTermos && <Text style={styles.termoTexto}>{erroTermos}</Text>}
+              {!carregandoTermos && !erroTermos && termos.map((termo) => (
+                <View key={termo.id} style={styles.termoItem}>
+                  <Text style={styles.termoTitulo}>{termo.titulo}</Text>
+                  <Text style={styles.termoTexto}>{termo.texto}</Text>
+                </View>
+                ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.btnFecharTermos}
+              onPress={() => setTermosVisiveis(false)}
+              accessibilityRole="button"
+            >
+              <Text style={styles.btnFecharTermosTexto}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -592,4 +631,39 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   btnSairTexto: { color: '#F44336', fontSize: 15, fontWeight: '600' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    maxHeight: '85%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalTitulo: { flex: 1, color: '#222', fontSize: 18, fontWeight: '700' },
+  modalConteudo: { flexShrink: 1 },
+  modalConteudoInterno: { paddingTop: 16, paddingBottom: 8 },
+  termoItem: { marginBottom: 18 },
+  termoTitulo: { color: '#1A9E75', fontSize: 15, fontWeight: '700', marginBottom: 6 },
+  termoTexto: { color: '#475569', fontSize: 14, lineHeight: 21 },
+  btnFecharTermos: {
+    alignItems: 'center',
+    backgroundColor: '#1A9E75',
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginTop: 8,
+  },
+  btnFecharTermosTexto: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

@@ -117,3 +117,10 @@ export type NotificacaoSistema = {
 };
 */
 }
+
+export type TermoDeUso = {
+  id: string;
+  ordem: number;
+  titulo: string;
+  texto: string;
+};

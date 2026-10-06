@@ -1,4 +1,4 @@
-import type { ContextoAnalise, Meta, Notificacao, Transacao } from '../types';
+import type { ContextoAnalise, Meta, Notificacao, TermoDeUso, Transacao, Video } from '../types';
 import { diagnosticarErroJwt, endpointAuth, endpointRest, headersAutenticados, headersPublicos, SUPABASE_URL } from './sessao';
 
 type CabecalhosHttp = Record<string, string>;
@@ -251,6 +251,20 @@ export async function salvarOuAtualizarPerfilUsuario(usuarioId: string, nome: st
     headers: { ...cabecalhos, Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify({ id: usuarioId, nome }),
   });
+}
+
+export async function buscarTermosDeUso(cabecalhos: CabecalhosHttp): Promise<TermoDeUso[]> {
+  const respostaDaApi = await validarRespostaDaApi(
+    await executarRequisicaoRest('termos_uso?select=*&order=ordem.asc', { headers: cabecalhos })
+  );
+  return respostaDaApi.json();
+}
+
+export async function buscarVideos(cabecalhos: CabecalhosHttp): Promise<Video[]> {
+  const respostaDaApi = await validarRespostaDaApi(
+    await executarRequisicaoRest('videos?select=*&order=ordem.asc', { headers: cabecalhos })
+  );
+  return respostaDaApi.json();
 }
 
 // Solicita uma análise educativa à Edge Function com os dados financeiros atuais.
