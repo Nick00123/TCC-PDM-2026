@@ -256,23 +256,7 @@ export async function salvarOuAtualizarPerfilUsuario(usuarioId: string, nome: st
 // Solicita uma análise educativa à Edge Function com os dados financeiros atuais.
 // Recebe o contexto tipado e retorna o texto da análise; falhas de rede/API são lançadas.
 export async function solicitarAnaliseFinanceiraDaIA(contexto: ContextoAnalise): Promise<string> {
-  // O prompt limita a resposta para ela ficar curta e útil dentro do app.
-  const prompt = `
-Você é um mentor financeiro educativo, empático e objetivo do app EduFinance.
-Analise somente os dados fornecidos. Não invente valores nem prometa rendimentos.
-Produza uma resposta curta, em português do Brasil, com no máximo 80 palavras.
-Indique uma ação que possa ser feita no app e recomende exatamente um conteúdo
-presente em "dicasDisponiveis".
-
-Responda obrigatoriamente neste formato, sem JSON e sem introdução:
-Situação Atual: <uma frase sobre receitas, despesas e saldo>
-Recomendação: <uma orientação prática e educativa>
-Sugestão de Conteúdo: <título exato de uma dica ou vídeo disponível>
-
-Dados financeiros atuais:
-${JSON.stringify(contexto)}
-  `.trim();
-
+ 
   const controlador = new AbortController();
   const limite = setTimeout(() => controlador.abort(), 30_000);
   let respostaDaApi: Response;
@@ -280,15 +264,16 @@ ${JSON.stringify(contexto)}
     respostaDaApi = await fetch(`${SUPABASE_URL}/functions/v1/bright-endpoint`, {
       method: 'POST',
       headers: await headersAutenticados(),
-      body: JSON.stringify({ prompt, contexto }),
+      body: JSON.stringify({ contexto }), //retirei o prompt e coloquei o contexto, ja que o prompt é gerado na edge function
       signal: controlador.signal,
     });
   } finally {
     clearTimeout(limite);
   }
 
-  if (!respostaDaApi.ok) {
-    throw new Error(`Falha ao analisar dados (${respostaDaApi.status}).`);
+    if (!respostaDaApi.ok) {
+    const detalhe = await respostaDaApi.text();
+    throw new Error(`Falha ao analisar dados (${respostaDaApi.status}): ${detalhe}`);
   }
 
   const corpoDaResposta = (await respostaDaApi.json()) as { resposta?: unknown };
@@ -297,4 +282,4 @@ ${JSON.stringify(contexto)}
   }
 
   return corpoDaResposta.resposta.trim();
-}
+};

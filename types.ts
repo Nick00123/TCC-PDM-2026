@@ -106,3 +106,14 @@ export type DadosRelatorio = {
   logoDataUrl: string;
   dataGeracao?: Date;
 };
+
+{ /*
+export type NotificacaoSistema = {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  dataCriacao: string;
+  vizualizado: boolean;
+};
+*/
+}

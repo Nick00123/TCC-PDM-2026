@@ -128,7 +128,7 @@ export default function Dicas() {
     let dicasRecebidas: Dica[];
     try {
       dicasRecebidas = await buscarDicas();
-      setDicas(dicasRecebidas);
+      setDicas(dicasRecebidas); 
     } catch (detalhesErro) {
       console.error(detalhesErro);
       setErroDicas('Não foi possível carregar as dicas. Toque em atualizar para tentar novamente.');
@@ -166,6 +166,11 @@ export default function Dicas() {
         descricao,
         categoria,
       }));
+
+      if (transacoesRecebidas.length === 0) {
+          setAnalise('Bem-vindo ao EduFinance! Registre sua primeira receita ou despesa na aba Transações e eu preparo uma análise personalizada para você.');
+          return;
+        }
 
       setAnalise(await solicitarAnaliseFinanceiraDaIA({ receitas, despesas, metas: metasAtivas, dicasDisponiveis }));
     } catch (detalhesErro) {
