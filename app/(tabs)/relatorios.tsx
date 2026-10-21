@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
+    Animated,
     ScrollView,
     StyleSheet,
     Text,
@@ -8,6 +9,7 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
+import { useAnimacaoCascata } from '../../utils/animacoes';
 
 import {
     ArrowDownRight,
@@ -33,6 +35,13 @@ const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 const COR_RECEITA = '#1a9e75';
 const COR_DESPESA = '#e24b4a';
 const CORES_CATEGORIAS = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
+
+function estiloCartao(animacao: Animated.Value) {
+  return {
+    opacity: animacao,
+    transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  };
+}
 
 const formatarValorEixoY = (valor: number) => {
   // Deixo os valores do eixo menores para não ocupar tanto espaço.
@@ -154,6 +163,9 @@ export default function Relatorios() {
     y: valorCategoria,
   }));
   const temDadosCategorias = dadosGraficoCategorias.length > 0;
+  const { animacoes: animacoesResumo } = useAnimacaoCascata(4, 0, 80);
+  const { animacoes: animacoesCategorias } = useAnimacaoCascata(dadosGraficoCategorias.length, 0, 60);
+  const { fadeAnimTop: fadeAnimAba } = useAnimacaoCascata(0, 0, 120, abaSelecionada);
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -182,7 +194,7 @@ export default function Relatorios() {
         <>
       {/* ── GRID DE SUMÁRIO ── */}
       <View style={styles.grid}>
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[0])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#E8F5E9' }]}>
             <ArrowUpRight size={16} color={COR_RECEITA} />
           </View>
@@ -190,9 +202,9 @@ export default function Relatorios() {
           <Text style={[styles.cardValor, { color: COR_RECEITA }]}>
             R$ {totalReceitas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[1])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#FFEBEE' }]}>
             <ArrowDownRight size={16} color={COR_DESPESA} />
           </View>
@@ -200,9 +212,9 @@ export default function Relatorios() {
           <Text style={[styles.cardValor, { color: COR_DESPESA }]}>
             R$ {totalDespesas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[2])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#E0F2FE' }]}>
             <TrendingUp size={16} color="#0284C7" />
           </View>
@@ -210,15 +222,15 @@ export default function Relatorios() {
           <Text style={[styles.cardValor, { color: economizado >= 0 ? COR_RECEITA : COR_DESPESA }]}>
             R$ {economizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[3])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#F0FDFA' }]}>
             <PieChart size={16} color="#0D9488" />
           </View>
           <Text style={styles.cardLabel}>Taxa de poupança</Text>
           <Text style={[styles.cardValor, { color: COR_RECEITA }]}>{taxaPoupanca}%</Text>
-        </View>
+        </Animated.View>
       </View>
 
       {/* As três abas mostram jeitos diferentes de olhar os mesmos dados. */}
@@ -241,6 +253,7 @@ export default function Relatorios() {
         ))}
       </View>
 
+      <Animated.View style={{ opacity: fadeAnimAba }}>
       {/* ── VISÃO GERAL ── */}
       {abaSelecionada === 'geral' && (
         <View style={styles.graficoCard}>
@@ -340,8 +353,19 @@ export default function Relatorios() {
               />
 
               <View style={styles.categoriasCards}>
-                {dadosGraficoCategorias.map((dadosCategoria, indiceCategoria) => (
-                  <View key={dadosCategoria.x} style={styles.categoriaCard}>
+                {dadosGraficoCategorias.map((dadosCategoria, indiceCategoria) => {
+                  const animacao = animacoesCategorias[indiceCategoria];
+                  return (
+                  <Animated.View
+                    key={dadosCategoria.x}
+                    style={[
+                      styles.categoriaCard,
+                      {
+                        opacity: animacao,
+                        transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                      },
+                    ]}
+                  >
                     <View style={[styles.categoriaDot, { backgroundColor: CORES_CATEGORIAS[indiceCategoria % CORES_CATEGORIAS.length] }]} />
                     <View style={styles.categoriaInfo}>
                       <Text style={styles.categoriaNome}>{dadosCategoria.x}</Text>
@@ -349,8 +373,8 @@ export default function Relatorios() {
                         R$ {dadosCategoria.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} • {totalDespesas > 0 ? ((dadosCategoria.y / totalDespesas) * 100).toFixed(1) : '0.0'}%
                       </Text>
                     </View>
-                  </View>
-                ))}
+                  </Animated.View>
+                );})}
               </View>
             </View>
           ) : (
@@ -399,6 +423,7 @@ export default function Relatorios() {
           </VictoryChart>
         </View>
       )}
+      </Animated.View>
         </>
       )}
 

@@ -1,10 +1,11 @@
 import { useFocusEffect } from 'expo-router';
 import { Brain, DollarSign, Play, Puzzle, RefreshCw, Ruler, Search, Shield, TrendingUp, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, ImageBackground, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { Dica, Meta, Transacao, Video } from '../../types';
 import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA, buscarVideos } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { useAnimacaoCascata, useAnimacaoModal } from '../../utils/animacoes';
 
 // Busca as dicas cadastradas no Supabase para alimentar a central de aprendizado.
 // Não recebe argumentos; retorna as dicas tipadas ou lança erro quando a API falha.
@@ -185,6 +186,9 @@ const carregarVideos = useCallback(async () => {
   const dicasVisiveis = buscaAtiva || mostrarTodas
     ? dicasFiltradas
     : dicasFiltradas.slice(0, 4);
+  const { animacoes: animacoesDicas } = useAnimacaoCascata(dicasVisiveis.length, 0, 80);
+  const { animacoes: animacoesVideos } = useAnimacaoCascata(videos.length, 0, 80);
+  const { estiloAnimado: estiloModalAnimado } = useAnimacaoModal(dicaAberta !== null);
 
   return (
     <ScrollView style={styles.container}>
@@ -237,28 +241,38 @@ const carregarVideos = useCallback(async () => {
 
       {carregandoDicas && <ActivityIndicator color="#1A9E75" style={styles.carregandoLista} />}
       {!carregandoDicas && erroDicas && <Text style={styles.erroLista}>{erroDicas}</Text>}
-      {!carregandoDicas && !erroDicas && dicasVisiveis.map((dicaAtual) => (
-        <TouchableOpacity
-          key={dicaAtual.id}
-          style={styles.dicaCard}
-          onPress={() => setDicaAberta(dicaAtual)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.dicaIcone}>{iconeDaDica(dicaAtual.categoria)}</View>
-          <View style={styles.dicaInfo}>
-            <View style={styles.dicaHeaderRow}>
-              <Text style={styles.dicaTitulo}>{dicaAtual.titulo}</Text>
-              <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dicaAtual.categoria] ?? '#F1F5F9' }]}>
-                <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dicaAtual.categoria] ?? '#475569' }]}>
-                  {dicaAtual.categoria}
-                </Text>
+      {!carregandoDicas && !erroDicas && dicasVisiveis.map((dicaAtual, indiceDica) => {
+        const animacao = animacoesDicas[indiceDica];
+        return (
+          <Animated.View
+            key={dicaAtual.id}
+            style={{
+              opacity: animacao,
+              transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+            }}
+          >
+            <TouchableOpacity
+              style={styles.dicaCard}
+              onPress={() => setDicaAberta(dicaAtual)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.dicaIcone}>{iconeDaDica(dicaAtual.categoria)}</View>
+              <View style={styles.dicaInfo}>
+                <View style={styles.dicaHeaderRow}>
+                  <Text style={styles.dicaTitulo}>{dicaAtual.titulo}</Text>
+                  <View style={[styles.badge, { backgroundColor: CORES_CATEGORIA[dicaAtual.categoria] ?? '#F1F5F9' }]}>
+                    <Text style={[styles.badgeTexto, { color: CORES_TEXTO[dicaAtual.categoria] ?? '#475569' }]}>
+                      {dicaAtual.categoria}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.dicaDescricao} numberOfLines={2}>{dicaAtual.descricao}</Text>
+                <Text style={styles.verDetalhe}>Ver conteúdo completo ▸</Text>
               </View>
-            </View>
-            <Text style={styles.dicaDescricao} numberOfLines={2}>{dicaAtual.descricao}</Text>
-            <Text style={styles.verDetalhe}>Ver conteúdo completo ▸</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
+            </TouchableOpacity>
+          </Animated.View>
+        );
+      })}
       {!carregandoDicas && !erroDicas && dicasFiltradas.length === 0 && (
         <Text style={styles.semResultados}>Nenhuma dica encontrada.</Text>
       )}
@@ -280,9 +294,17 @@ const carregarVideos = useCallback(async () => {
       {erroVideos && <Text style={styles.erroLista}>{erroVideos}</Text>}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.videosScroll}>
-        {videos.map((videoAtual) => (
-          <TouchableOpacity
+        {videos.map((videoAtual, indiceVideo) => {
+          const animacao = animacoesVideos[indiceVideo];
+          return (
+          <Animated.View
             key={videoAtual.id}
+            style={{
+              opacity: animacao,
+              transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+            }}
+          >
+          <TouchableOpacity
             style={styles.videoCard}
             onPress={() => Linking.openURL(videoAtual.url)}
           >
@@ -308,18 +330,19 @@ const carregarVideos = useCallback(async () => {
               <Text style={styles.videoDuracao}>⏱ {videoAtual.duracao}</Text>
             </View>
           </TouchableOpacity>
-        ))}
+          </Animated.View>
+        );})}
       </ScrollView>
 
       {/* Modal de detalhes da dica */}
       <Modal
         visible={dicaAberta !== null}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setDicaAberta(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.modalContainer, estiloModalAnimado]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalIconeMesa}>
                 {dicaAberta ? iconeDaDica(dicaAberta.categoria) : null}
@@ -350,7 +373,7 @@ const carregarVideos = useCallback(async () => {
             <TouchableOpacity style={styles.btnEntendi} onPress={() => setDicaAberta(null)}>
               <Text style={styles.btnEntendiTexto}>Entendi!</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 

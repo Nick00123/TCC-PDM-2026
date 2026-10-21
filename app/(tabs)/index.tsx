@@ -12,7 +12,8 @@ import type { Meta, Notificacao, Transacao } from '../../types';
 import { alterarNotificacoes, buscarMetas, buscarNotificacoes, buscarTransacoes, criarNotificacao } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAnimacaoCascata } from '../../utils/animacoes';
 
 // Mostro poucos itens na home para ela não ficar cheia demais.
 const LIMITE_METAS = 5;
@@ -106,6 +107,8 @@ export default function Home() {
   const metasEmAndamento = metas.filter((metaAtual: Meta) => metaAtual.atual < metaAtual.total);
   const metasVisiveis = metasEmAndamento.slice(0, LIMITE_METAS);
   const transacoesVisiveis = transacoes.slice(0, LIMITE_TRANSACOES);
+  const { fadeAnimTop, animacoes: animacoesMetas } = useAnimacaoCascata(metasVisiveis.length);
+  const { animacoes: animacoesTransacoes } = useAnimacaoCascata(transacoesVisiveis.length);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -115,16 +118,29 @@ export default function Home() {
       ) : erroTransacoes ? (
         <View style={styles.aviso}><Text style={styles.avisoTexto}>Resumo financeiro indisponível.</Text></View>
       ) : (
-        <BalanceCard saldo={saldoTotal} receitas={totalReceitas} despesas={totalDespesas} />
+        <Animated.View style={{ opacity: fadeAnimTop }}>
+          <BalanceCard saldo={saldoTotal} receitas={totalReceitas} despesas={totalDespesas} />
+        </Animated.View>
       )}
       <AcoesRapidas />
 
       {/* Mostro só as metas abertas e deixo um botão para ver o restante. */}
       {metasEmAndamento.length > 0 && (
         <>
-          {metasVisiveis.map((metaAtual: Meta) => (
-            <MetaCard key={metaAtual.id} {...metaAtual} />
-          ))}
+          {metasVisiveis.map((metaAtual: Meta, indiceMeta) => {
+            const animacao = animacoesMetas[indiceMeta];
+            return (
+              <Animated.View
+                key={metaAtual.id}
+                style={{
+                  opacity: animacao,
+                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                }}
+              >
+                <MetaCard {...metaAtual} />
+              </Animated.View>
+            );
+          })}
           {metasEmAndamento.length > LIMITE_METAS && (
             <TouchableOpacity
               style={styles.verMais}
@@ -142,9 +158,20 @@ export default function Home() {
 
       {!carregandoTransacoes && !erroTransacoes && transacoes.length > 0 && (
         <>
-          {transacoesVisiveis.map((transacaoAtual: Transacao) => (
-            <TransacaoItem key={transacaoAtual.id} {...transacaoAtual} />
-          ))}
+          {transacoesVisiveis.map((transacaoAtual: Transacao, indiceTransacao) => {
+            const animacao = animacoesTransacoes[indiceTransacao];
+            return (
+              <Animated.View
+                key={transacaoAtual.id}
+                style={{
+                  opacity: animacao,
+                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                }}
+              >
+                <TransacaoItem {...transacaoAtual} />
+              </Animated.View>
+            );
+          })}
           {transacoes.length > LIMITE_TRANSACOES && (
             <TouchableOpacity
               style={styles.verMais}

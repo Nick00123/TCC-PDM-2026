@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { Check, Plus, Target, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ModalDeposito, ModalNovaMeta } from '../../components/MetasModais';
 import type { Meta } from '../../types';
 import { formatarMoeda } from '../../utils/formatacao';
 import { atualizarProgressoDaMeta, buscarMetas, consultarValoresAtuaisDaMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { useAnimacaoCascata } from '../../utils/animacoes';
 
 // Carrega, cria, exclui e atualiza o progresso das metas do usuário.
 // Usa callbacks dos modais para executar as operações e atualizar a lista exibida.
@@ -88,6 +89,8 @@ export default function Metas() {
   const metasConcluidas = (metas ?? []).filter(
     (metaAtual: Meta) => metaAtual.atual >= metaAtual.total
   );
+  const { animacoes: animacoesMetasAtivas } = useAnimacaoCascata(metasEmAndamento.length, 0, 80);
+  const { animacoes: animacoesMetasConcluidas } = useAnimacaoCascata(metasConcluidas.length, 0, 80);
 
   // Valida os campos do formulário e solicita a criação da meta.
   const salvarNovaMeta = async () => {
@@ -252,13 +255,23 @@ export default function Metas() {
       {metasEmAndamento.length > 0 && (
         <>
           <Text style={styles.secaoTitulo}>EM ANDAMENTO</Text>
-          {metasEmAndamento.map((metaAtual: Meta) => {
+          {metasEmAndamento.map((metaAtual: Meta, indiceMeta) => {
             const percentualConcluido =
               metaAtual.total > 0
                 ? Math.min(Math.round((metaAtual.atual / metaAtual.total) * 100), 100)
                 : 0;
+            const animacao = animacoesMetasAtivas[indiceMeta];
             return (
-              <View key={metaAtual.id} style={styles.card}>
+              <Animated.View
+                key={metaAtual.id}
+                style={[
+                  styles.card,
+                  {
+                    opacity: animacao,
+                    transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                  },
+                ]}
+              >
                 <View style={styles.cardHeader}>
                   <Text style={styles.metaTitulo}>{metaAtual.titulo}</Text>
                   <TouchableOpacity
@@ -284,7 +297,7 @@ export default function Metas() {
                 <TouchableOpacity style={styles.btnDepositar} onPress={() => setMetaSelecionada(metaAtual.id)}>
                   <Text style={styles.btnDepositarTexto}>+ Depositar</Text>
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
             );
           })}
         </>
@@ -294,8 +307,20 @@ export default function Metas() {
       {metasConcluidas.length > 0 && (
         <>
           <Text style={styles.secaoTitulo}>CONCLUÍDAS</Text>
-          {metasConcluidas.map((metaAtual: Meta) => (
-            <View key={metaAtual.id} style={[styles.card, styles.cardConcluida]}>
+          {metasConcluidas.map((metaAtual: Meta, indiceMeta) => {
+            const animacao = animacoesMetasConcluidas[indiceMeta];
+            return (
+            <Animated.View
+              key={metaAtual.id}
+              style={[
+                styles.card,
+                styles.cardConcluida,
+                {
+                  opacity: animacao,
+                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                },
+              ]}
+            >
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.metaTitulo}>{metaAtual.titulo}</Text>
@@ -303,8 +328,8 @@ export default function Metas() {
                 </View>
                 <Check size={22} color="#1A9E75" />
               </View>
-            </View>
-          ))}
+            </Animated.View>
+          );})}
         </>
       )}
 
