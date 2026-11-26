@@ -1,5 +1,6 @@
 import { X } from 'lucide-react-native';
-import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAnimacaoModal } from '../utils/animacoes';
 
 type Props = {
   tipo: 'receita' | 'despesa' | null;
@@ -19,9 +20,12 @@ type Props = {
 // Recebe valores, categorias e callbacks por props; não retorna dados do formulário.
 export default function FormularioTransacao({ tipo, valor, descricao, categoria, categorias, salvando, setValor, setDescricao, setCategoria, fechar, salvar }: Props) {
   // O mesmo formulário serve para receita e despesa.
+  const visivel = tipo !== null;
+  const { estiloAnimado } = useAnimacaoModal(visivel);
+
   return (
-    <Modal visible={tipo !== null} animationType="slide" transparent>
-      <View style={styles.overlay}><View style={styles.card}>
+    <Modal visible={visivel} animationType="fade" transparent onRequestClose={fechar}>
+      <View style={styles.overlay}><Animated.View style={[styles.card, estiloAnimado]}>
         <View style={styles.header}>
           <Text style={styles.titulo}>{tipo === 'receita' ? 'Nova Receita' : 'Nova Despesa'}</Text>
           <TouchableOpacity onPress={fechar} disabled={salvando}><X size={22} color="#666" /></TouchableOpacity>
@@ -43,7 +47,7 @@ export default function FormularioTransacao({ tipo, valor, descricao, categoria,
         <TouchableOpacity style={[styles.salvar, { backgroundColor: tipo === 'receita' ? '#0D9488' : '#E11D48' }]} onPress={salvar} disabled={salvando}>
           <Text style={styles.salvarTexto}>{salvando ? 'Salvando...' : `✓ Adicionar ${tipo === 'receita' ? 'Receita' : 'Despesa'}`}</Text>
         </TouchableOpacity>
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }

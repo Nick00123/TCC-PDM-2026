@@ -1,12 +1,13 @@
 import { useFocusEffect } from 'expo-router';
 import { ArrowDownRight, ArrowUpRight, Filter, Plus, Trash2 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import FormularioTransacao from '../../components/FormularioTransacao';
 import type { FiltroTransacao, TipoModalTransacao, Transacao } from '../../types';
 import { corDaCategoria, formatarData, normalizarData } from '../../utils/formatacao';
 import { buscarTransacoes, criarTransacao, excluirTransacao } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../../utils/animacoes';
 
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
@@ -229,6 +230,8 @@ export default function Transacoes() {
 
   // A lista de categorias muda conforme o tipo escolhido.
   const categoriasDisponiveis = tipoModalTransacao === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
+  const gruposPorDataEntradas = Object.entries(gruposPorData);
+  const { animacoes: animacoesGrupos } = useAnimacaoCascata(gruposPorDataEntradas.length, 0, 80, carregandoTransacoes);
 
   return (
     <View style={styles.container}>
@@ -302,8 +305,13 @@ export default function Transacoes() {
           <Text style={styles.estadoLista}>Nenhuma transação cadastrada.</Text>
         ) : transacoesFiltradas.length === 0 ? (
           <Text style={styles.estadoLista}>Nenhuma transação encontrada.</Text>
-        ) : Object.entries(gruposPorData).map(([dataKey, grupoDoDia]) => (
-          <View key={dataKey}>
+        ) : gruposPorDataEntradas.map(([dataKey, grupoDoDia], indiceGrupo) => {
+          const animacao = animacoesGrupos[indiceGrupo];
+          return (
+          <Animated.View
+            key={dataKey}
+            style={estiloEntradaCascata(animacao)}
+          >
             <View style={styles.dataHeader}>
               <Text style={styles.dataLabel}>{formatarData(dataKey)}</Text>
               <Text style={[styles.dataTotal, { color: grupoDoDia.totalDia >= 0 ? '#0D9488' : '#E11D48' }]}>
@@ -339,8 +347,8 @@ export default function Transacoes() {
                 </TouchableOpacity>
               </View>
             ))}
-          </View>
-        ))}
+          </Animated.View>
+        );})}
       </ScrollView>
 
       <FormularioTransacao tipo={tipoModalTransacao} valor={valorTransacao} descricao={descricao} categoria={categoria} categorias={categoriasDisponiveis} salvando={salvando} setValor={setValorTransacao} setDescricao={setDescricao} setCategoria={setCategoria} fechar={limparFormularioTransacao} salvar={salvarTransacao} />

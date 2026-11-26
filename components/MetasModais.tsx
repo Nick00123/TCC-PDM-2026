@@ -1,4 +1,5 @@
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useAnimacaoModal } from '../utils/animacoes';
 
 type NovaMetaProps = { visivel: boolean; titulo: string; total: string; salvando: boolean; setTitulo: (valor: string) => void; setTotal: (valor: string) => void; salvar: () => void; fechar: () => void };
 
@@ -6,9 +7,11 @@ type NovaMetaProps = { visivel: boolean; titulo: string; total: string; salvando
 // Recebe os campos, estado e callbacks; não retorna os dados digitados.
 export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, setTotal, salvar, fechar }: NovaMetaProps) {
   // Esse modal pega os dados necessários para criar uma meta nova.
+  const { estiloAnimado } = useAnimacaoModal(visivel);
+
   return (
-    <Modal visible={visivel} animationType="slide" transparent>
-      <View style={styles.overlay}><View style={styles.card}>
+    <Modal visible={visivel} animationType="fade" transparent onRequestClose={fechar}>
+      <View style={styles.overlay}><Animated.View style={[styles.card, estiloAnimado]}>
         <Text style={styles.titulo}>Nova Meta</Text>
         <Text style={styles.label}>Nome da meta</Text>
         <TextInput style={styles.input} placeholder="Ex: Viagem para Europa" value={titulo} onChangeText={setTitulo} />
@@ -16,7 +19,7 @@ export function ModalNovaMeta({ visivel, titulo, total, salvando, setTitulo, set
         <TextInput style={styles.input} placeholder="Ex: 8000,00" keyboardType="decimal-pad" value={total} onChangeText={setTotal} />
         <TouchableOpacity style={styles.salvar} onPress={salvar} disabled={salvando}><Text style={styles.salvarTexto}>{salvando ? 'Salvando...' : 'Criar Meta'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.cancelar} onPress={fechar} disabled={salvando}><Text style={styles.cancelarTexto}>Cancelar</Text></TouchableOpacity>
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }
@@ -27,15 +30,17 @@ type DepositoProps = { visivel: boolean; valor: string; depositando: boolean; se
 // Recebe o valor, estado e callbacks; não retorna os dados digitados.
 export function ModalDeposito({ visivel, valor, depositando, setValor, confirmar, fechar }: DepositoProps) {
   // Esse outro modal serve só para colocar dinheiro em uma meta existente.
+  const { estiloAnimado } = useAnimacaoModal(visivel);
+
   return (
-    <Modal visible={visivel} animationType="slide" transparent>
-      <View style={styles.overlay}><View style={styles.card}>
+    <Modal visible={visivel} animationType="fade" transparent onRequestClose={fechar}>
+      <View style={styles.overlay}><Animated.View style={[styles.card, estiloAnimado]}>
         <Text style={styles.titulo}>Depositar</Text>
         <Text style={styles.label}>Valor (R$)</Text>
         <TextInput style={styles.input} placeholder="0,00" keyboardType="decimal-pad" value={valor} onChangeText={setValor} />
         <TouchableOpacity style={styles.salvar} onPress={confirmar} disabled={depositando}><Text style={styles.salvarTexto}>{depositando ? 'Depositando...' : 'Confirmar'}</Text></TouchableOpacity>
         <TouchableOpacity style={styles.cancelar} onPress={fechar} disabled={depositando}><Text style={styles.cancelarTexto}>Cancelar</Text></TouchableOpacity>
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Animated,
     FlatList,
     Modal,
     StyleSheet,
@@ -11,6 +12,7 @@ import {
     View,
 } from 'react-native';
 import type { Notificacao, ResultadoOperacao } from '../types';
+import { estiloEntradaCascata, useAnimacaoCascata, useAnimacaoModal } from '../utils/animacoes';
 
 type Props = {
   visivel: boolean;
@@ -69,6 +71,8 @@ export default function NotificacoesModal({
   const [marcandoNotificacaoId, setMarcandoNotificacaoId] = useState<string | null>(null);
   const [marcandoTodasNotificacoes, setMarcandoTodasNotificacoes] = useState(false);
   const [excluindoNotificacaoId, setExcluindoNotificacaoId] = useState<string | null>(null);
+  const { animacoes } = useAnimacaoCascata(notificacoes.length, 0, 60, visivel);
+  const { estiloAnimado } = useAnimacaoModal(visivel);
 
   // Chama a ação da tela apenas se a notificação ainda não estiver sendo processada.
   const marcarNotificacaoComoLida = async (notificacaoAtual: Notificacao) => {
@@ -136,13 +140,18 @@ export default function NotificacoesModal({
   };
 
   // Constrói a linha de uma notificação usando o tipo para escolher ícone e cores.
-  const renderizarNotificacao = ({ item: notificacaoAtual }: { item: Notificacao }) => {
+  const renderizarNotificacao = ({ item: notificacaoAtual, index }: { item: Notificacao; index: number }) => {
     const estiloNotificacao = CORES_TIPO[notificacaoAtual.tipo] || CORES_TIPO.sistema;
     const iconeNotificacao = ICONES_TIPO[notificacaoAtual.tipo] || ICONES_TIPO.sistema;
+    const animacao = animacoes[index];
 
     return (
-      <View
-        style={[styles.item, !notificacaoAtual.lida && styles.itemNaoLida]}
+      <Animated.View
+        style={[
+          styles.item,
+          !notificacaoAtual.lida && styles.itemNaoLida,
+          animacao && estiloEntradaCascata(animacao),
+        ]}
       >
         <TouchableOpacity
           style={styles.itemConteudo}
@@ -155,7 +164,7 @@ export default function NotificacoesModal({
           </View>
           <View style={styles.info}>
             <Text style={styles.titulo}>{notificacaoAtual.titulo}</Text>
-            <Text style={styles.mensagem} numberOfLines={3}>
+            <Text style={styles.mensagem}>
               {notificacaoAtual.mensagem}
             </Text>
             <Text style={styles.tempo}>{formatarTempoDecorrido(notificacaoAtual.criadaEm)}</Text>
@@ -170,7 +179,7 @@ export default function NotificacoesModal({
         >
           <Trash2 size={16} color="#CCC" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -178,11 +187,11 @@ export default function NotificacoesModal({
     <Modal
       visible={visivel}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={onFechar}
     >
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <Animated.View style={[styles.container, estiloAnimado]}>
           <View style={styles.header}>
             <View>
               <Text style={styles.tituloHeader}>Notificações</Text>
@@ -237,7 +246,7 @@ export default function NotificacoesModal({
               showsVerticalScrollIndicator={false}
             />
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

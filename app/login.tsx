@@ -4,6 +4,7 @@ import { Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Alert,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -16,6 +17,7 @@ import {
 } from 'react-native';
 import Botao from '../components/Botao';
 import { enviarAutenticacao, salvarOuAtualizarPerfilUsuario } from '../utils/requisicoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../utils/animacoes';
 import {
   criarSessao,
   headersAutenticados,
@@ -54,6 +56,7 @@ export default function Login() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [processandoAutenticacao, setProcessandoAutenticacao] = useState(false);
   const router = useRouter();
+  const { animacoes: animacoesCartao } = useAnimacaoCascata(1, 120, 80);
 
   // Valida os campos e executa login ou cadastro conforme a aba escolhida.
   const confirmarAutenticacao = async () => {
@@ -155,7 +158,7 @@ export default function Login() {
           {modoAutenticacao === 'entrar' ? 'Que bom te ver de novo!' : 'Crie sua conta gratuita'}
         </Text>
 
-        <View style={styles.card}>
+        <Animated.View style={[styles.card, estiloEntradaCascata(animacoesCartao[0])]}>
           {/* Essa barra escolhe entre entrar e criar uma conta. */}
           <View style={styles.abas}>
             <Pressable
@@ -304,7 +307,7 @@ export default function Login() {
               />
             </View>
           )}
-        </View>
+        </Animated.View>
 
         <Text style={styles.footerText}>Seus dados são privados e seguros</Text>
       </ScrollView>

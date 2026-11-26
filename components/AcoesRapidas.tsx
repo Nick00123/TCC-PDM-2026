@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { ArrowDownLeft, ArrowUpRight, BarChart2, Target } from 'lucide-react-native';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../utils/animacoes';
 
 const acoesRapidas = [
   { label: 'Receita', icone: ArrowDownLeft, cor: '#E6F4EA', corIcone: '#1A9E75', rota: '/transacoes' },
@@ -12,22 +13,25 @@ const acoesRapidas = [
 // Exibe atalhos de navegação para as principais áreas do aplicativo.
 // Não recebe props nem retorna dados; renderiza os botões de ação rápida.
 export default function AcoesRapidas() {
+  const { animacoes } = useAnimacaoCascata(acoesRapidas.length, 100, 70);
+
   return (
     <View style={styles.container}>
-      {acoesRapidas.map((acao) => {
+      {acoesRapidas.map((acao, indice) => {
         const Icone = acao.icone;
         return (
-          <TouchableOpacity
-            key={acao.label}
-            style={styles.item}
-            onPress={() => router.push(acao.rota as any)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.boxIcone, { backgroundColor: acao.cor }]}>
-              <Icone size={22} color={acao.corIcone} />
-            </View>
-            <Text style={styles.label}>{acao.label}</Text>
-          </TouchableOpacity>
+          <Animated.View key={acao.label} style={[styles.itemWrapper, estiloEntradaCascata(animacoes[indice])]}>
+            <TouchableOpacity
+              style={styles.item}
+              onPress={() => router.push(acao.rota as any)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.boxIcone, { backgroundColor: acao.cor }]}>
+                <Icone size={22} color={acao.corIcone} />
+              </View>
+              <Text style={styles.label}>{acao.label}</Text>
+            </TouchableOpacity>
+          </Animated.View>
         );
       })}
     </View>
@@ -43,6 +47,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
+  itemWrapper: { flex: 1 },
   item: { alignItems: 'center', flex: 1 },
   boxIcone: {
     width: 56,

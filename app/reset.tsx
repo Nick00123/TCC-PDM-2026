@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../utils/animacoes';
 import { endpointAuth, headersPublicos } from '../utils/sessao';
 
 // Normaliza parâmetros que o Expo Router pode entregar como texto ou lista.
@@ -21,10 +22,11 @@ export default function RedefinirSenha() {
   const [tokenDoLink, setTokenDoLink] = useState<string | undefined>(
     obterPrimeiroParametro(parametrosDaRota.access_token)
   );
+  const { animacoes: animacoesCartao } = useAnimacaoCascata(1, 120, 80);
 
   useEffect(() => {
     // O token pode chegar pela URL que abriu o app ou por um link recebido depois.
-    const atualizarTokenDoLink = (urlRecebida: string | null) => {
+    const atualizarTokenDoLink = (urlRecebida: string | null | undefined) => {
       if (!urlRecebida) return;
       const correspondenciaToken = /(?:[?#&])access_token=([^&]+)/.exec(urlRecebida);
       if (correspondenciaToken?.[1]) setTokenDoLink(decodeURIComponent(correspondenciaToken[1]));
@@ -78,7 +80,7 @@ export default function RedefinirSenha() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <Animated.View style={[styles.card, estiloEntradaCascata(animacoesCartao[0])]}>
         <Text style={styles.titulo}>Redefinir senha</Text>
         <Text style={styles.subtitulo}>Escolha uma nova senha para sua conta.</Text>
         <TextInput
@@ -98,7 +100,7 @@ export default function RedefinirSenha() {
         <Pressable style={styles.botao} onPress={atualizarSenha} disabled={salvando}>
           <Text style={styles.botaoTexto}>{salvando ? 'Salvando...' : 'Atualizar senha'}</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }

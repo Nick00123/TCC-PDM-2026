@@ -3,22 +3,26 @@ import * as Print from 'expo-print';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import {
+    Camera,
     Bug,
     ChevronRight,
     FileText,
-    HelpCircle,
     Lightbulb,
     LogOut,
     Send,
     Star,
     X,
+    UserRoundPen,
 } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { Alert, Animated, Image, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import type { ImagePickerAsset } from 'expo-image-picker';
 import type { CategoriaFeedback, OpcaoFeedback, Usuario, TermoDeUso } from '../../types';
 import { criarHtmlRelatorioPdf, obterLogoRelatorio } from '../../utils/relatorioPdf';
-import { buscarMetas, buscarResumoFinanceiroUsuario, buscarTransacoes, criarNotificacao, buscarTermosDeUso , enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
+import { buscarMetas, buscarTransacoes, criarNotificacao, buscarTermosDeUso, salvarOuAtualizarPerfilUsuario, enviarFeedback as enviarFeedbackAoBanco } from '../../utils/requisicoes';
 import {
+    atualizarMetadadosUsuario,
     carregarSessao,
     endpointAuth,
     headersAutenticados,
@@ -26,6 +30,8 @@ import {
     obterUsuarioDaSessao,
     removerSessao,
 } from '../../utils/sessao';
+import { estiloEntradaCascata, useAnimacaoCascata, useAnimacaoModal } from '../../utils/animacoes';
+import { enviarFotoPerfil, obterUrlFotoPerfil } from '../../utils/storagePerfil';
 
 const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
   { chave: 'sugestao', icone: Lightbulb, label: 'Sugestão' },
@@ -35,14 +41,16 @@ const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
 
 
 
-// Exibe os dados da conta, resumo financeiro, suporte e ações do perfil.
-// Carrega dados da sessão e executa ações de feedback, PDF e encerramento.
+// Exibe os dados da conta, suporte e ações do perfil.
+// Carrega a sessão e executa ações de feedback, PDF e encerramento.
 export default function Perfil() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [totalReceitas, setTotalReceitas] = useState(0);
-  const [totalDespesas, setTotalDespesas] = useState(0);
-  const [carregandoTransacoes, setCarregandoTransacoes] = useState(true);
-  const [erroTransacoes, setErroTransacoes] = useState<string | null>(null);
+  const [caminhoFotoPerfil, setCaminhoFotoPerfil] = useState<string | null>(null);
+  const [urlFotoPerfil, setUrlFotoPerfil] = useState<string | null>(null);
+  const [editarPerfilVisivel, setEditarPerfilVisivel] = useState(false);
+  const [nomeEmEdicao, setNomeEmEdicao] = useState('');
+  const [fotoSelecionada, setFotoSelecionada] = useState<ImagePickerAsset | null>(null);
+  const [salvandoPerfil, setSalvandoPerfil] = useState(false);
 
   const [feedback, setFeedback] = useState('');
   const [categoriaFeedback, setCategoriaFeedback] = useState<CategoriaFeedback>('sugestao');
@@ -56,11 +64,12 @@ export default function Perfil() {
   const [termos, setTermos] = useState<TermoDeUso[]>([]);
   const [carregandoTermos, setCarregandoTermos] = useState(false);
   const [erroTermos, setErroTermos] = useState<string | null>(null);
+  const { estiloAnimado: estiloTermosAnimado } = useAnimacaoModal(termosVisiveis);
+  const { estiloAnimado: estiloEditarPerfilAnimado } = useAnimacaoModal(editarPerfilVisivel);
+  const { animacoes: animacoesCartoesPerfil } = useAnimacaoCascata(4, 100, 80);
 
-  // Busca o usuário autenticado e soma suas receitas e despesas.
+  // Busca os dados básicos da conta autenticada.
   const carregarDadosDoPerfil = useCallback(async () => {
-    // Busco os dados do usuário e o resumo financeiro para esta tela.
-    setCarregandoTransacoes(true);
     try {
       const usuarioDaSessao = await obterUsuarioDaSessao();
       if (!usuarioDaSessao) {
@@ -72,23 +81,12 @@ export default function Perfil() {
         nome: usuarioDaSessao.user_metadata?.nome || usuarioDaSessao.email?.split('@')[0] || '',
         email: usuarioDaSessao.email || '',
       });
-      const transacoesDoResumo = await buscarResumoFinanceiroUsuario(usuarioDaSessao.id, await headersAutenticados());
-      setTotalReceitas(
-        transacoesDoResumo
-          .filter((transacaoAtual: any) => transacaoAtual.tipo === 'receita')
-          .reduce((somaValores: number, transacaoAtual: any) => somaValores + Number(transacaoAtual.valor), 0)
-      );
-      setTotalDespesas(
-        transacoesDoResumo
-          .filter((transacaoAtual: any) => transacaoAtual.tipo === 'despesa')
-          .reduce((somaValores: number, transacaoAtual: any) => somaValores + Number(transacaoAtual.valor), 0)
-      );
-      setErroTransacoes(null);
+      const caminhoAvatar = usuarioDaSessao.user_metadata?.avatar_path ?? null;
+      setCaminhoFotoPerfil(caminhoAvatar);
+      setUrlFotoPerfil(caminhoAvatar ? await obterUrlFotoPerfil(caminhoAvatar) : null);
     } catch (detalhesErro) {
       console.error(detalhesErro);
-      setErroTransacoes('Resumo indisponível');
-    } finally {
-      setCarregandoTransacoes(false);
+      setUrlFotoPerfil(null);
     }
   }, [router]);
 
@@ -97,6 +95,121 @@ export default function Perfil() {
       void carregarDadosDoPerfil();
     }, [carregarDadosDoPerfil])
   );
+
+  function abrirEdicaoPerfil() {
+    setNomeEmEdicao(usuario?.nome ?? '');
+    setFotoSelecionada(null);
+    setEditarPerfilVisivel(true);
+  }
+
+  async function selecionarFotoPerfil() {
+    try {
+      const permissao = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissao.granted) {
+        Alert.alert('Permissão necessária', 'Permita o acesso às fotos para escolher uma imagem de perfil.');
+        return;
+      }
+
+      const resultado = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        exif: false,
+      });
+      if (!resultado.canceled) {
+        setFotoSelecionada(resultado.assets[0]);
+      }
+    } catch (detalhesErro) {
+      console.error('Erro ao escolher foto de perfil:', detalhesErro);
+      Alert.alert('Erro', 'Não foi possível abrir a galeria de fotos.');
+    }
+  }
+
+  async function salvarPerfil() {
+    const nomeAtualizado = nomeEmEdicao.trim();
+    if (!nomeAtualizado) {
+      Alert.alert('Nome obrigatório', 'Informe seu nome para salvar as alterações.');
+      return;
+    }
+    if (nomeAtualizado.length > 80) {
+      Alert.alert('Nome muito longo', 'O nome deve ter no máximo 80 caracteres.');
+      return;
+    }
+    if (!usuario || salvandoPerfil) return;
+    const nomeFoiAlterado = nomeAtualizado !== usuario.nome;
+    const fotoFoiAlterada = fotoSelecionada !== null;
+
+    if (!nomeFoiAlterado && !fotoFoiAlterada) {
+      setEditarPerfilVisivel(false);
+      return;
+    }
+
+    setSalvandoPerfil(true);
+    let nomeSalvo = false;
+    try {
+      const respostaPerfil = await salvarOuAtualizarPerfilUsuario(
+        usuario.id,
+        nomeAtualizado,
+        await headersAutenticados()
+      );
+      if (!respostaPerfil.ok) {
+        const detalheErro = await respostaPerfil.text();
+        throw new Error(`Não foi possível salvar o nome do perfil (${respostaPerfil.status}): ${detalheErro}`);
+      }
+
+      const metadadosAtuais = {
+        nome: nomeAtualizado,
+        ...(caminhoFotoPerfil ? { avatar_path: caminhoFotoPerfil } : {}),
+      };
+      const usuarioAtualizado = await atualizarMetadadosUsuario(metadadosAtuais);
+      nomeSalvo = true;
+
+      setUsuario({
+        ...usuario,
+        nome: usuarioAtualizado.user_metadata?.nome ?? nomeAtualizado,
+      });
+
+      if (fotoSelecionada) {
+        const caminhoAvatar = await enviarFotoPerfil(usuario.id, fotoSelecionada);
+        await atualizarMetadadosUsuario({ ...metadadosAtuais, avatar_path: caminhoAvatar });
+        setCaminhoFotoPerfil(caminhoAvatar);
+        setUrlFotoPerfil(fotoSelecionada.uri);
+      }
+
+      const mensagemNotificacao = nomeFoiAlterado && fotoFoiAlterada
+        ? 'Seu nome e sua foto de perfil foram atualizados com sucesso.'
+        : nomeFoiAlterado
+          ? 'Seu nome foi atualizado com sucesso.'
+          : 'Sua foto de perfil foi atualizada com sucesso.';
+      try {
+        await criarNotificacao(
+          {
+            usuario_id: usuario.id,
+            titulo: 'Perfil atualizado',
+            mensagem: mensagemNotificacao,
+            tipo: 'sistema',
+            lida: false,
+            chave_evento: `perfil_atualizado:${Date.now()}`,
+          },
+          await headersAutenticados()
+        );
+      } catch (detalhesErroNotificacao) {
+        console.error('Erro ao registrar notificação de atualização do perfil:', detalhesErroNotificacao);
+      }
+
+      setEditarPerfilVisivel(false);
+      Alert.alert('Perfil atualizado', 'Suas alterações foram salvas.');
+    } catch (detalhesErro) {
+      console.error('Erro ao atualizar perfil:', detalhesErro);
+      Alert.alert(
+        nomeSalvo ? 'Nome salvo; foto não enviada' : 'Não foi possível atualizar',
+        detalhesErro instanceof Error ? detalhesErro.message : 'Tente novamente mais tarde.'
+      );
+    } finally {
+      setSalvandoPerfil(false);
+    }
+  }
 
   // Avisa o Supabase que a sessão terminou e depois remove os dados locais.
   async function encerrarSessaoUsuario() {
@@ -145,7 +258,7 @@ export default function Perfil() {
         `relatorio-edufinance-${Date.now()}.pdf`
       );
       arquivoPdfCompartilhavel.create({ overwrite: true });
-      arquivoPdfCompartilhavel.write(arquivoPdf.base64, { encoding: 'base64' });
+      await arquivoPdfCompartilhavel.write(arquivoPdf.base64, { encoding: 'base64' });
 
       try {
         await criarNotificacao(
@@ -246,46 +359,36 @@ export default function Perfil() {
   return (
     <ScrollView style={[styles.container, coresTema.container]}>
       {/* Card do usuário */}
-      <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' }]}>
+      <Animated.View style={[styles.cardUsuario, estiloEntradaCascata(animacoesCartoesPerfil[0]), { backgroundColor: '#1A9E75' }]}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarTexto}>
-            {usuario?.nome ? usuario.nome[0].toUpperCase() : 'U'}
-          </Text>
+          {urlFotoPerfil ? (
+            <Image source={{ uri: urlFotoPerfil }} style={styles.avatarImagem} />
+          ) : (
+            <Text style={styles.avatarTexto}>{usuario?.nome ? usuario.nome[0].toUpperCase() : 'U'}</Text>
+          )}
         </View>
-        <View>
+        <View style={styles.dadosUsuario}>
           <Text style={styles.nomeUsuario}>{usuario?.nome || 'Usuário'}</Text>
           <Text style={styles.emailUsuario}>{usuario?.email || 'email@exemplo.com'}</Text>
         </View>
-      </View>
-
-      {/* Resumo financeiro */}
-      <View style={[styles.resumo, { backgroundColor: coresTema.card }]}>
-        {carregandoTransacoes || erroTransacoes ? (
-          <Text style={styles.resumoEstado}>
-            {carregandoTransacoes ? 'Carregando resumo...' : 'Resumo indisponível'}
-          </Text>
-        ) : (
-          <>
-            <View style={styles.resumoItem}>
-              <Text style={[styles.resumoValor, { color: '#1A9E75' }]}>R$ {totalReceitas.toFixed(2)}</Text>
-              <Text style={[styles.resumoLabel, { color: coresTema.subText }]}>Receitas</Text>
-            </View>
-            <View style={styles.divisor} />
-            <View style={styles.resumoItem}>
-              <Text style={[styles.resumoValor, { color: '#F44336' }]}>R$ {totalDespesas.toFixed(2)}</Text>
-              <Text style={[styles.resumoLabel, { color: coresTema.subText }]}>Despesas</Text>
-            </View>
-          </>
-        )}
-      </View>
+        <TouchableOpacity
+          style={styles.botaoEditarPerfil}
+          onPress={abrirEdicaoPerfil}
+          disabled={!usuario}
+          accessibilityRole="button"
+          accessibilityLabel="Editar perfil"
+        >
+          <UserRoundPen size={19} color="#1A9E75" />
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Configurações */}
-      <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>CONFIGURAÇÕES</Text>
-      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
+      <Text style={[styles.secaoTitulo, { color: coresTema.subText, marginTop: 24 }]}>CONFIGURAÇÕES</Text>
+      <Animated.View style={[styles.secao, estiloEntradaCascata(animacoesCartoesPerfil[1]), { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
         <TouchableOpacity
           style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}
           onPress={gerarRelatorioPdf}
-          disabled={gerandoPdf || carregandoTransacoes || !usuario}
+          disabled={gerandoPdf || !usuario}
         >
           <View style={styles.itemEsquerda}>
             <FileText size={20} color="#1A9E75" />
@@ -314,11 +417,11 @@ export default function Perfil() {
           </View>
           <ChevronRight size={18} color="#ccc" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Ajuda e suporte */}
       <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>AJUDA E SUPORTE</Text>
-      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
+      <Animated.View style={[styles.secao, estiloEntradaCascata(animacoesCartoesPerfil[2]), { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border, paddingBottom: 18 }]}>
         <View style={[styles.faqCard, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Perguntas Frequentes (FAQ)</Text>
           <Text style={[styles.faqText, { color: coresTema.subText }]}>• Como adicionar uma nova receita/despesa?</Text>
@@ -341,7 +444,7 @@ export default function Perfil() {
             });
           }}
         >
-          <Text style={styles.contactButtonText}>Fale Conosco</Text>
+          <Text style={styles.contactButtonText}>Atendimento via Gmail</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -360,69 +463,61 @@ export default function Perfil() {
           <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
 
-        <View style={[styles.feedbackBox, { backgroundColor: coresTema.card, borderColor: coresTema.border }]}>
-          <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Feedback / Enviar Sugestão</Text>
-          <Text style={[styles.feedbackSubtitulo, { color: coresTema.subText }]}>
-            Sua mensagem vai direto para os desenvolvedores do app.
+      </Animated.View>
+
+      {/* Feedback */}
+      <Text style={[styles.secaoTitulo, { color: coresTema.subText, marginTop: 24 }]}>FEEDBACK</Text>
+      <Animated.View style={[styles.feedbackBox, estiloEntradaCascata(animacoesCartoesPerfil[3]), { backgroundColor: coresTema.card, borderColor: coresTema.border }]}>
+        <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Enviar sugestão ou feedback</Text>
+        <Text style={[styles.feedbackSubtitulo, { color: coresTema.subText }]}>
+          Sua mensagem vai direto para os desenvolvedores do app.
+        </Text>
+
+        <View style={styles.categoriaRow}>
+          {CATEGORIAS_FEEDBACK.map((cat) => {
+            const ativa = categoriaFeedback === cat.chave;
+            const Icone = cat.icone;
+            const corIcone = ativa ? '#FFFFFF' : '#64748B';
+
+            return (
+              <TouchableOpacity
+                key={cat.chave}
+                style={[styles.categoriaChip, ativa && styles.categoriaChipAtivo]}
+                onPress={() => setCategoriaFeedback(cat.chave)}
+              >
+                <Icone size={14} color={corIcone} />
+                <Text style={[styles.categoriaTexto, ativa && styles.categoriaTextoAtivo]}>
+                  {cat.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <TextInput
+          style={[styles.feedbackInput, { color: coresTema.text, borderColor: coresTema.border, backgroundColor: coresTema.sectionBg }]}
+          placeholder="Escreva sua ideia de melhoria, sugestão ou relato de bug..."
+          placeholderTextColor="#999"
+          value={feedback}
+          onChangeText={setFeedback}
+          multiline
+        />
+
+        {feedbackEnviado && (
+          <Text style={styles.feedbackSucesso}>✓ Feedback enviado com sucesso!</Text>
+        )}
+
+        <TouchableOpacity
+          style={[styles.btnEnviarFeedback, { backgroundColor: '#1A9E75' }]}
+          onPress={enviarFeedbackDoUsuario}
+          disabled={enviandoFeedback}
+        >
+          <Send size={16} color="#fff" />
+          <Text style={styles.btnEnviarFeedbackTexto}>
+            {enviandoFeedback ? 'Enviando...' : 'Enviar Feedback'}
           </Text>
-
-          <View style={styles.categoriaRow}>
-            {CATEGORIAS_FEEDBACK.map((cat) => {
-              const ativa = categoriaFeedback === cat.chave;
-              const Icone = cat.icone;
-              const corIcone = ativa ? '#FFFFFF' : '#64748B';
-
-              return (
-                <TouchableOpacity
-                  key={cat.chave}
-                  style={[styles.categoriaChip, ativa && styles.categoriaChipAtivo]}
-                  onPress={() => setCategoriaFeedback(cat.chave)}
-                >
-                  <Icone size={14} color={corIcone} />
-                  <Text style={[styles.categoriaTexto, ativa && styles.categoriaTextoAtivo]}>
-                    {cat.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <TextInput
-            style={[styles.feedbackInput, { color: coresTema.text, borderColor: coresTema.border, backgroundColor: coresTema.sectionBg }]}
-            placeholder="Escreva sua ideia de melhoria"
-            placeholderTextColor="#999"
-            value={feedback}
-            onChangeText={setFeedback}
-            multiline
-          />
-
-          {feedbackEnviado && (
-            <Text style={styles.feedbackSucesso}>✓ Feedback enviado com sucesso!</Text>
-          )}
-
-          <TouchableOpacity
-            style={[styles.btnEnviarFeedback, { backgroundColor: '#1A9E75' }]}
-            onPress={enviarFeedbackDoUsuario}
-            disabled={enviandoFeedback}
-          >
-            <Send size={16} color="#fff" />
-            <Text style={styles.btnEnviarFeedbackTexto}>
-              {enviandoFeedback ? 'Enviando...' : 'Enviar Feedback'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
-          <View style={styles.itemEsquerda}>
-            <HelpCircle size={20} color="#1A9E75" />
-            <View>
-              <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Reportar um Problema (Bug)</Text>
-              <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Avisar se algo travou ou não está funcionando</Text>
-            </View>
-          </View>
-          <ChevronRight size={18} color="#ccc" />
-        </View>
-      </View>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Rodapé */}
       <Text style={[styles.versao, { color: coresTema.text }]}>⭐ EduFinance v1.0</Text>
@@ -448,13 +543,105 @@ export default function Perfil() {
       </TouchableOpacity>
 
       <Modal
+        visible={editarPerfilVisivel}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditarPerfilVisivel(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Animated.View style={[styles.modalContainer, estiloEditarPerfilAnimado]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitulo}>Editar perfil</Text>
+              <TouchableOpacity
+                onPress={() => setEditarPerfilVisivel(false)}
+                disabled={salvandoPerfil}
+                accessibilityRole="button"
+                accessibilityLabel="Fechar edição do perfil"
+              >
+                <X size={22} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.editorPerfilConteudo}
+              contentContainerStyle={styles.editorPerfilConteudoInterno}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <TouchableOpacity
+                style={styles.seletorFoto}
+                onPress={selecionarFotoPerfil}
+                disabled={salvandoPerfil}
+                accessibilityRole="button"
+                accessibilityLabel="Escolher foto de perfil"
+              >
+                {fotoSelecionada ? (
+                  <Image source={{ uri: fotoSelecionada.uri }} style={styles.fotoPreview} />
+                ) : urlFotoPerfil ? (
+                  <Image source={{ uri: urlFotoPerfil }} style={styles.fotoPreview} />
+                ) : (
+                  <View style={styles.fotoPlaceholder}>
+                    <Text style={styles.fotoPlaceholderTexto}>
+                      {nomeEmEdicao.trim() ? nomeEmEdicao.trim()[0].toUpperCase() : 'U'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.iconeCamera}>
+                  <Camera size={17} color="#fff" />
+                </View>
+                <Text style={[styles.itemSubtitulo, { color: coresTema.subText }]}>Toque para escolher uma foto</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.labelCampo, { color: coresTema.subText }]}>Nome</Text>
+              <TextInput
+                style={[styles.campoNome, { color: coresTema.text, borderColor: coresTema.border, backgroundColor: coresTema.sectionBg }]}
+                value={nomeEmEdicao}
+                onChangeText={setNomeEmEdicao}
+                placeholder="Seu nome"
+                placeholderTextColor="#999"
+                maxLength={80}
+                autoCapitalize="words"
+                editable={!salvandoPerfil}
+                returnKeyType="done"
+                onSubmitEditing={salvarPerfil}
+              />
+            </ScrollView>
+
+            <View style={styles.acoesEditorPerfil}>
+              <TouchableOpacity
+                style={styles.botaoCancelarPerfil}
+                onPress={() => setEditarPerfilVisivel(false)}
+                disabled={salvandoPerfil}
+                accessibilityRole="button"
+              >
+                <Text style={styles.botaoCancelarPerfilTexto}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnEnviarFeedback, styles.botaoSalvarPerfil]}
+                onPress={salvarPerfil}
+                disabled={salvandoPerfil}
+                accessibilityRole="button"
+              >
+                <Text style={styles.btnEnviarFeedbackTexto}>
+                  {salvandoPerfil ? 'Salvando...' : 'Confirmar e salvar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
         visible={termosVisiveis}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setTermosVisiveis(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
+          <Animated.View style={[styles.modalContainer, estiloTermosAnimado]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitulo}>Termos de Uso e Política de Privacidade</Text>
               <TouchableOpacity
@@ -489,7 +676,7 @@ export default function Perfil() {
             >
               <Text style={styles.btnFecharTermosTexto}>Fechar</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </ScrollView>
@@ -515,19 +702,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarTexto: { fontSize: 24, fontWeight: 'bold', color: '#fff' },
+  avatarImagem: { width: '100%', height: '100%', borderRadius: 28 },
+  dadosUsuario: { flex: 1 },
+  botaoEditarPerfil: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   nomeUsuario: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
   emailUsuario: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  resumo: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    padding: 20,
-    marginBottom: 16,
-  },
-  resumoItem: { flex: 1, alignItems: 'center' },
-  resumoEstado: { flex: 1, color: '#64748B', textAlign: 'center' },
-  resumoValor: { fontSize: 18, fontWeight: 'bold', color: '#1A9E75' },
-  resumoLabel: { fontSize: 12, color: '#888', marginTop: 4 },
-  divisor: { width: 1, backgroundColor: '#F0F0F0' },
   secaoTitulo: {
     fontSize: 11,
     color: '#888',
@@ -631,6 +817,50 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   btnSairTexto: { color: '#F44336', fontSize: 15, fontWeight: '600' },
+  seletorFoto: { alignItems: 'center', marginBottom: 20, gap: 8 },
+  fotoPreview: { width: 88, height: 88, borderRadius: 44 },
+  fotoPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: '#1A9E75',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fotoPlaceholderTexto: { color: '#fff', fontSize: 34, fontWeight: '700' },
+  iconeCamera: {
+    position: 'absolute',
+    top: 58,
+    left: '55%',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#1A9E75',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  labelCampo: { fontSize: 13, fontWeight: '600', marginBottom: 6 },
+  campoNome: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+  },
+  botaoSalvarPerfil: { flex: 1, backgroundColor: '#1A9E75', marginTop: 0, marginHorizontal: 0 },
+  botaoCancelarPerfil: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  botaoCancelarPerfilTexto: { color: '#475569', fontSize: 15, fontWeight: '700' },
+  acoesEditorPerfil: { flexDirection: 'row', gap: 10, marginTop: 16 },
+  editorPerfilConteudo: { flexShrink: 1 },
+  editorPerfilConteudoInterno: { paddingTop: 16, paddingBottom: 4 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react-native';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useAnimacaoModal } from '../utils/animacoes';
 
 type Props = {
   visivel: boolean;
@@ -12,9 +13,11 @@ type Props = {
 // Exibe os meses disponíveis e informa à tela qual índice foi selecionado.
 // Recebe a lista de meses e callbacks; não retorna dados diretamente.
 export default function SeletorMesModal({ visivel, meses, mesSelecionado, selecionar, fechar }: Props) {
+  const { estiloAnimado } = useAnimacaoModal(visivel);
+
   return (
     <Modal visible={visivel} transparent animationType="fade" onRequestClose={fechar}>
-      <View style={styles.overlay}><View style={styles.container}>
+      <View style={styles.overlay}><Animated.View style={[styles.container, estiloAnimado]}>
         <View style={styles.header}>
           <Text style={styles.titulo}>Selecionar Mês</Text>
           <TouchableOpacity onPress={fechar}><X size={20} color="#8E8E93" /></TouchableOpacity>
@@ -27,7 +30,7 @@ export default function SeletorMesModal({ visivel, meses, mesSelecionado, seleci
             </TouchableOpacity>
           ))}
         </View>
-      </View></View>
+      </Animated.View></View>
     </Modal>
   );
 }

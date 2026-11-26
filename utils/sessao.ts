@@ -23,6 +23,7 @@ export type Sessao = {
     email?: string;
     user_metadata?: {
       nome?: string;
+      avatar_path?: string;
     };
   };
 };
@@ -198,6 +199,39 @@ export async function headersAutenticados(): Promise<Record<string, string>> {
     ...headersPublicos(),
     Authorization: `Bearer ${sessao.accessToken}`,
   };
+}
+
+// Atualiza os metadados do usuário autenticado e sincroniza a sessão local.
+export async function atualizarMetadadosUsuario(
+  metadados: NonNullable<Sessao['user']['user_metadata']>
+): Promise<Sessao['user']> {
+  const sessao = await obterSessaoValida();
+  if (!sessao) {
+    throw new Error('Usuário não autenticado.');
+  }
+
+  const respostaDaApi = await fetch(endpointAuth('user'), {
+    method: 'PUT',
+    headers: await headersAutenticados(),
+    body: JSON.stringify({ data: metadados }),
+  });
+
+  if (!respostaDaApi.ok) {
+    const detalheErro = await respostaDaApi.text();
+    throw new Error(`Não foi possível atualizar o perfil (${respostaDaApi.status}): ${detalheErro}`);
+  }
+
+  const usuarioAtualizado = (await respostaDaApi.json()) as Sessao['user'];
+  if (!usuarioAtualizado.id) {
+    throw new Error('O Supabase retornou um usuário inválido ao atualizar o perfil.');
+  }
+
+  const sessaoAtual = await carregarSessao();
+  if (sessaoAtual?.refreshToken === sessao.refreshToken) {
+    await salvarSessao({ ...sessaoAtual, user: usuarioAtualizado });
+  }
+
+  return usuarioAtualizado;
 }
 
 // Compara o horário de emissão do JWT com os relógios do cliente e servidor.
