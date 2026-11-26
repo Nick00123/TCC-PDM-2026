@@ -13,7 +13,7 @@ import { alterarNotificacoes, buscarMetas, buscarNotificacoes, buscarTransacoes,
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
 
 import { Animated, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAnimacaoCascata } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../../utils/animacoes';
 
 // Mostro poucos itens na home para ela não ficar cheia demais.
 const LIMITE_METAS = 5;
@@ -82,22 +82,33 @@ export default function Home() {
   );
 
   // Acrescenta o usuário à consulta e recarrega a home após a alteração.
-  async function alterarNotificacaoDoUsuario(urlConsulta: string, metodoHttp: 'PATCH' | 'DELETE') {
+  async function alterarNotificacaoDoUsuario(
+    urlConsulta: string,
+    metodoHttp: 'PATCH' | 'DELETE',
+    camposAtualizados?: { lida?: boolean; excluida?: boolean }
+  ) {
     const usuario = await obterUsuarioDaSessao();
     if (!usuario) return { sucesso: false, mensagem: 'Você precisa estar autenticado.' };
     const separadorConsulta = urlConsulta.includes('?') ? '&' : '?';
     await alterarNotificacoes(
       `${urlConsulta}${separadorConsulta}usuario_id=eq.${encodeURIComponent(usuario.id)}`,
       metodoHttp,
-      await headersAutenticados()
+      await headersAutenticados(),
+      camposAtualizados
     );
     await carregarResumoInicio();
     return { sucesso: true, mensagem: '' };
   }
 
   async function marcarLida(notificacaoId: string) { return alterarNotificacaoDoUsuario(`notificacoes?id=eq.${encodeURIComponent(notificacaoId)}`, 'PATCH'); }
-  async function marcarTodasLidas() { return alterarNotificacaoDoUsuario('notificacoes?lida=eq.false', 'PATCH'); }
-  async function excluirNotificacao(notificacaoId: string) { return alterarNotificacaoDoUsuario(`notificacoes?id=eq.${encodeURIComponent(notificacaoId)}`, 'DELETE'); }
+  async function marcarTodasLidas() { return alterarNotificacaoDoUsuario('notificacoes?lida=eq.false&excluida=eq.false', 'PATCH'); }
+  async function excluirNotificacao(notificacaoId: string) {
+    return alterarNotificacaoDoUsuario(
+      `notificacoes?id=eq.${encodeURIComponent(notificacaoId)}`,
+      'PATCH',
+      { excluida: true }
+    );
+  }
 
   const totalReceitas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'receita').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
   const totalDespesas = transacoes.filter((transacaoAtual) => transacaoAtual.tipo === 'despesa').reduce((somaValores, transacaoAtual) => somaValores + transacaoAtual.valor, 0);
@@ -107,8 +118,9 @@ export default function Home() {
   const metasEmAndamento = metas.filter((metaAtual: Meta) => metaAtual.atual < metaAtual.total);
   const metasVisiveis = metasEmAndamento.slice(0, LIMITE_METAS);
   const transacoesVisiveis = transacoes.slice(0, LIMITE_TRANSACOES);
-  const { fadeAnimTop, animacoes: animacoesMetas } = useAnimacaoCascata(metasVisiveis.length);
-  const { animacoes: animacoesTransacoes } = useAnimacaoCascata(transacoesVisiveis.length);
+  const { fadeAnimTop, animacoes: animacoesMetas } = useAnimacaoCascata(metasVisiveis.length, 100, 80, carregandoTransacoes);
+  const { animacoes: animacoesTransacoes } = useAnimacaoCascata(transacoesVisiveis.length, 100, 80, carregandoTransacoes);
+  const { animacoes: animacoesGraficos } = useAnimacaoCascata(2, 250, 100, carregandoTransacoes);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -118,7 +130,7 @@ export default function Home() {
       ) : erroTransacoes ? (
         <View style={styles.aviso}><Text style={styles.avisoTexto}>Resumo financeiro indisponível.</Text></View>
       ) : (
-        <Animated.View style={{ opacity: fadeAnimTop }}>
+        <Animated.View style={estiloEntradaCascata(fadeAnimTop)}>
           <BalanceCard saldo={saldoTotal} receitas={totalReceitas} despesas={totalDespesas} />
         </Animated.View>
       )}
@@ -132,10 +144,7 @@ export default function Home() {
             return (
               <Animated.View
                 key={metaAtual.id}
-                style={{
-                  opacity: animacao,
-                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                }}
+                style={estiloEntradaCascata(animacao)}
               >
                 <MetaCard {...metaAtual} />
               </Animated.View>
@@ -163,10 +172,7 @@ export default function Home() {
             return (
               <Animated.View
                 key={transacaoAtual.id}
-                style={{
-                  opacity: animacao,
-                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                }}
+                style={estiloEntradaCascata(animacao)}
               >
                 <TransacaoItem {...transacaoAtual} />
               </Animated.View>
@@ -189,8 +195,12 @@ export default function Home() {
 
       {!carregandoTransacoes && !erroTransacoes && (
         <>
-          <EvolucaoMensal transacoes={transacoes} />
-          <GastosPorCategoria transacoes={transacoes} />
+          <Animated.View style={estiloEntradaCascata(animacoesGraficos[0])}>
+            <EvolucaoMensal transacoes={transacoes} />
+          </Animated.View>
+          <Animated.View style={estiloEntradaCascata(animacoesGraficos[1])}>
+            <GastosPorCategoria transacoes={transacoes} />
+          </Animated.View>
         </>
       )}
     </ScrollView>

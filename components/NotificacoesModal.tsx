@@ -12,7 +12,7 @@ import {
     View,
 } from 'react-native';
 import type { Notificacao, ResultadoOperacao } from '../types';
-import { useAnimacaoCascata, useAnimacaoModal } from '../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata, useAnimacaoModal } from '../utils/animacoes';
 
 type Props = {
   visivel: boolean;
@@ -150,10 +150,7 @@ export default function NotificacoesModal({
         style={[
           styles.item,
           !notificacaoAtual.lida && styles.itemNaoLida,
-          animacao && {
-            opacity: animacao,
-            transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-          },
+          animacao && estiloEntradaCascata(animacao),
         ]}
       >
         <TouchableOpacity
@@ -167,7 +164,7 @@ export default function NotificacoesModal({
           </View>
           <View style={styles.info}>
             <Text style={styles.titulo}>{notificacaoAtual.titulo}</Text>
-            <Text style={styles.mensagem} numberOfLines={3}>
+            <Text style={styles.mensagem}>
               {notificacaoAtual.mensagem}
             </Text>
             <Text style={styles.tempo}>{formatarTempoDecorrido(notificacaoAtual.criadaEm)}</Text>

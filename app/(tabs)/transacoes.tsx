@@ -7,7 +7,7 @@ import type { FiltroTransacao, TipoModalTransacao, Transacao } from '../../types
 import { corDaCategoria, formatarData, normalizarData } from '../../utils/formatacao';
 import { buscarTransacoes, criarTransacao, excluirTransacao } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
-import { useAnimacaoCascata } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../../utils/animacoes';
 
 const CATEGORIAS_RECEITA = ['Salário', 'Investimentos', 'Outros'];
 const CATEGORIAS_DESPESA = ['Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Outros'];
@@ -231,7 +231,7 @@ export default function Transacoes() {
   // A lista de categorias muda conforme o tipo escolhido.
   const categoriasDisponiveis = tipoModalTransacao === 'receita' ? CATEGORIAS_RECEITA : CATEGORIAS_DESPESA;
   const gruposPorDataEntradas = Object.entries(gruposPorData);
-  const { animacoes: animacoesGrupos } = useAnimacaoCascata(gruposPorDataEntradas.length, 0, 80);
+  const { animacoes: animacoesGrupos } = useAnimacaoCascata(gruposPorDataEntradas.length, 0, 80, carregandoTransacoes);
 
   return (
     <View style={styles.container}>
@@ -310,10 +310,7 @@ export default function Transacoes() {
           return (
           <Animated.View
             key={dataKey}
-            style={{
-              opacity: animacao,
-              transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-            }}
+            style={estiloEntradaCascata(animacao)}
           >
             <View style={styles.dataHeader}>
               <Text style={styles.dataLabel}>{formatarData(dataKey)}</Text>

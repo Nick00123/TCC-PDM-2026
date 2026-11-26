@@ -30,7 +30,7 @@ import {
     obterUsuarioDaSessao,
     removerSessao,
 } from '../../utils/sessao';
-import { useAnimacaoModal } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata, useAnimacaoModal } from '../../utils/animacoes';
 import { enviarFotoPerfil, obterUrlFotoPerfil } from '../../utils/storagePerfil';
 
 const CATEGORIAS_FEEDBACK: OpcaoFeedback[] = [
@@ -66,6 +66,7 @@ export default function Perfil() {
   const [erroTermos, setErroTermos] = useState<string | null>(null);
   const { estiloAnimado: estiloTermosAnimado } = useAnimacaoModal(termosVisiveis);
   const { estiloAnimado: estiloEditarPerfilAnimado } = useAnimacaoModal(editarPerfilVisivel);
+  const { animacoes: animacoesCartoesPerfil } = useAnimacaoCascata(4, 100, 80);
 
   // Busca os dados básicos da conta autenticada.
   const carregarDadosDoPerfil = useCallback(async () => {
@@ -257,7 +258,7 @@ export default function Perfil() {
         `relatorio-edufinance-${Date.now()}.pdf`
       );
       arquivoPdfCompartilhavel.create({ overwrite: true });
-      arquivoPdfCompartilhavel.write(arquivoPdf.base64, { encoding: 'base64' });
+      await arquivoPdfCompartilhavel.write(arquivoPdf.base64, { encoding: 'base64' });
 
       try {
         await criarNotificacao(
@@ -358,7 +359,7 @@ export default function Perfil() {
   return (
     <ScrollView style={[styles.container, coresTema.container]}>
       {/* Card do usuário */}
-      <View style={[styles.cardUsuario, { backgroundColor: '#1A9E75' }]}>
+      <Animated.View style={[styles.cardUsuario, estiloEntradaCascata(animacoesCartoesPerfil[0]), { backgroundColor: '#1A9E75' }]}>
         <View style={styles.avatar}>
           {urlFotoPerfil ? (
             <Image source={{ uri: urlFotoPerfil }} style={styles.avatarImagem} />
@@ -379,11 +380,11 @@ export default function Perfil() {
         >
           <UserRoundPen size={19} color="#1A9E75" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Configurações */}
       <Text style={[styles.secaoTitulo, { color: coresTema.subText, marginTop: 24 }]}>CONFIGURAÇÕES</Text>
-      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
+      <Animated.View style={[styles.secao, estiloEntradaCascata(animacoesCartoesPerfil[1]), { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border }]}>
         <TouchableOpacity
           style={[styles.itemConfig, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}
           onPress={gerarRelatorioPdf}
@@ -416,11 +417,11 @@ export default function Perfil() {
           </View>
           <ChevronRight size={18} color="#ccc" />
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Ajuda e suporte */}
       <Text style={[styles.secaoTitulo, { color: coresTema.subText }]}>AJUDA E SUPORTE</Text>
-      <View style={[styles.secao, { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border, paddingBottom: 18 }]}>
+      <Animated.View style={[styles.secao, estiloEntradaCascata(animacoesCartoesPerfil[2]), { backgroundColor: coresTema.sectionBg, borderColor: coresTema.border, paddingBottom: 18 }]}>
         <View style={[styles.faqCard, { backgroundColor: coresTema.card, borderBottomColor: coresTema.border }]}>
           <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Perguntas Frequentes (FAQ)</Text>
           <Text style={[styles.faqText, { color: coresTema.subText }]}>• Como adicionar uma nova receita/despesa?</Text>
@@ -462,11 +463,11 @@ export default function Perfil() {
           <Text style={styles.contactButtonText}>Atendimento via WhatsApp</Text>
         </TouchableOpacity>
 
-      </View>
+      </Animated.View>
 
       {/* Feedback */}
       <Text style={[styles.secaoTitulo, { color: coresTema.subText, marginTop: 24 }]}>FEEDBACK</Text>
-      <View style={[styles.feedbackBox, { backgroundColor: coresTema.card, borderColor: coresTema.border }]}>
+      <Animated.View style={[styles.feedbackBox, estiloEntradaCascata(animacoesCartoesPerfil[3]), { backgroundColor: coresTema.card, borderColor: coresTema.border }]}>
         <Text style={[styles.itemTitulo, { color: coresTema.text }]}>Enviar sugestão ou feedback</Text>
         <Text style={[styles.feedbackSubtitulo, { color: coresTema.subText }]}>
           Sua mensagem vai direto para os desenvolvedores do app.
@@ -516,7 +517,7 @@ export default function Perfil() {
             {enviandoFeedback ? 'Enviando...' : 'Enviar Feedback'}
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Rodapé */}
       <Text style={[styles.versao, { color: coresTema.text }]}>⭐ EduFinance v1.0</Text>

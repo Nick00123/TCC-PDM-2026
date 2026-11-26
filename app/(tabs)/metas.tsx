@@ -7,7 +7,7 @@ import type { Meta } from '../../types';
 import { formatarMoeda } from '../../utils/formatacao';
 import { atualizarProgressoDaMeta, buscarMetas, consultarValoresAtuaisDaMeta, criarMeta, excluirMeta as excluirMetaNoBanco } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
-import { useAnimacaoCascata } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../../utils/animacoes';
 
 // Carrega, cria, exclui e atualiza o progresso das metas do usuário.
 // Usa callbacks dos modais para executar as operações e atualizar a lista exibida.
@@ -89,8 +89,8 @@ export default function Metas() {
   const metasConcluidas = (metas ?? []).filter(
     (metaAtual: Meta) => metaAtual.atual >= metaAtual.total
   );
-  const { animacoes: animacoesMetasAtivas } = useAnimacaoCascata(metasEmAndamento.length, 0, 80);
-  const { animacoes: animacoesMetasConcluidas } = useAnimacaoCascata(metasConcluidas.length, 0, 80);
+  const { animacoes: animacoesMetasAtivas } = useAnimacaoCascata(metasEmAndamento.length, 0, 80, carregandoMetas);
+  const { animacoes: animacoesMetasConcluidas } = useAnimacaoCascata(metasConcluidas.length, 0, 80, carregandoMetas);
 
   // Valida os campos do formulário e solicita a criação da meta.
   const salvarNovaMeta = async () => {
@@ -264,13 +264,7 @@ export default function Metas() {
             return (
               <Animated.View
                 key={metaAtual.id}
-                style={[
-                  styles.card,
-                  {
-                    opacity: animacao,
-                    transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                  },
-                ]}
+                style={[styles.card, estiloEntradaCascata(animacao)]}
               >
                 <View style={styles.cardHeader}>
                   <Text style={styles.metaTitulo}>{metaAtual.titulo}</Text>
@@ -312,14 +306,7 @@ export default function Metas() {
             return (
             <Animated.View
               key={metaAtual.id}
-              style={[
-                styles.card,
-                styles.cardConcluida,
-                {
-                  opacity: animacao,
-                  transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                },
-              ]}
+              style={[styles.card, styles.cardConcluida, estiloEntradaCascata(animacao)]}
             >
               <View style={styles.cardHeader}>
                 <View>

@@ -9,7 +9,7 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
-import { useAnimacaoCascata } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../../utils/animacoes';
 
 import {
     ArrowDownRight,
@@ -35,13 +35,6 @@ const NOMES_MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Se
 const COR_RECEITA = '#1a9e75';
 const COR_DESPESA = '#e24b4a';
 const CORES_CATEGORIAS = ['#1A9E75', '#FF9800', '#2196F3', '#F44336', '#9C27B0', '#FF5722', '#607D8B'];
-
-function estiloCartao(animacao: Animated.Value) {
-  return {
-    opacity: animacao,
-    transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
-}
 
 const formatarValorEixoY = (valor: number) => {
   // Deixo os valores do eixo menores para não ocupar tanto espaço.
@@ -163,8 +156,8 @@ export default function Relatorios() {
     y: valorCategoria,
   }));
   const temDadosCategorias = dadosGraficoCategorias.length > 0;
-  const { animacoes: animacoesResumo } = useAnimacaoCascata(4, 0, 80);
-  const { animacoes: animacoesCategorias } = useAnimacaoCascata(dadosGraficoCategorias.length, 0, 60);
+  const { animacoes: animacoesResumo } = useAnimacaoCascata(4, 0, 80, carregandoTransacoes);
+  const { animacoes: animacoesCategorias } = useAnimacaoCascata(dadosGraficoCategorias.length, 0, 60, mesSelecionado);
   const { fadeAnimTop: fadeAnimAba } = useAnimacaoCascata(0, 0, 120, abaSelecionada);
 
   return (
@@ -194,7 +187,7 @@ export default function Relatorios() {
         <>
       {/* ── GRID DE SUMÁRIO ── */}
       <View style={styles.grid}>
-        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[0])]}>
+        <Animated.View style={[styles.card, estiloEntradaCascata(animacoesResumo[0])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#E8F5E9' }]}>
             <ArrowUpRight size={16} color={COR_RECEITA} />
           </View>
@@ -204,7 +197,7 @@ export default function Relatorios() {
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[1])]}>
+        <Animated.View style={[styles.card, estiloEntradaCascata(animacoesResumo[1])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#FFEBEE' }]}>
             <ArrowDownRight size={16} color={COR_DESPESA} />
           </View>
@@ -214,7 +207,7 @@ export default function Relatorios() {
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[2])]}>
+        <Animated.View style={[styles.card, estiloEntradaCascata(animacoesResumo[2])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#E0F2FE' }]}>
             <TrendingUp size={16} color="#0284C7" />
           </View>
@@ -224,7 +217,7 @@ export default function Relatorios() {
           </Text>
         </Animated.View>
 
-        <Animated.View style={[styles.card, estiloCartao(animacoesResumo[3])]}>
+        <Animated.View style={[styles.card, estiloEntradaCascata(animacoesResumo[3])]}>
           <View style={[styles.iconeCircle, { backgroundColor: '#F0FDFA' }]}>
             <PieChart size={16} color="#0D9488" />
           </View>
@@ -253,7 +246,7 @@ export default function Relatorios() {
         ))}
       </View>
 
-      <Animated.View style={{ opacity: fadeAnimAba }}>
+      <Animated.View style={estiloEntradaCascata(fadeAnimAba)}>
       {/* ── VISÃO GERAL ── */}
       {abaSelecionada === 'geral' && (
         <View style={styles.graficoCard}>

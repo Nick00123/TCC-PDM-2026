@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { Bot, FileText, LineChart, PiggyBank, Sparkles, Target, Wallet } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { Animated, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useAnimacaoCascata } from '../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata } from '../utils/animacoes';
 import { obterSessaoValida } from '../utils/sessao';
 
 const RECURSOS_APRESENTACAO = [
@@ -82,21 +82,10 @@ export default function Intro() {
       {/* Cards de Recursos com Animação em Cascata */}
       <View style={styles.cardsGrid}>
         {RECURSOS_APRESENTACAO.map((recursoAtual, index) => {
-          const translacao = animacoes[index].interpolate({
-            inputRange: [0, 1],
-            outputRange: [30, 0],
-          });
-
           return (
             <Animated.View
               key={recursoAtual.titulo}
-              style={[
-                styles.card,
-                {
-                  opacity: animacoes[index],
-                  transform: [{ translateY: translacao }],
-                },
-              ]}
+              style={[styles.card, estiloEntradaCascata(animacoes[index])]}
             >
               <View style={styles.cardIcone}>{recursoAtual.icone}</View>
               <View style={styles.cardInfo}>

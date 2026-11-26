@@ -5,7 +5,7 @@ import { ActivityIndicator, Animated, ImageBackground, Linking, Modal, ScrollVie
 import type { Dica, Meta, Transacao, Video } from '../../types';
 import { buscarMetas, buscarTransacoes, executarRequisicaoRest, solicitarAnaliseFinanceiraDaIA, buscarVideos } from '../../utils/requisicoes';
 import { headersAutenticados, obterUsuarioDaSessao } from '../../utils/sessao';
-import { useAnimacaoCascata, useAnimacaoModal } from '../../utils/animacoes';
+import { estiloEntradaCascata, useAnimacaoCascata, useAnimacaoModal } from '../../utils/animacoes';
 
 // Busca as dicas cadastradas no Supabase para alimentar a central de aprendizado.
 // Não recebe argumentos; retorna as dicas tipadas ou lança erro quando a API falha.
@@ -77,6 +77,7 @@ export default function Dicas() {
   const [carregandoAnalise, setCarregandoAnalise] = useState(true);
   const [erroAnalise, setErroAnalise] = useState<string | null>(null);
   const [busca, setBusca] = useState('');
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
   const [mostrarTodas, setMostrarTodas] = useState(false);
   const [dicaAberta, setDicaAberta] = useState<Dica | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -173,21 +174,30 @@ const carregarVideos = useCallback(async () => {
     }, [carregarConteudoDaTela])
   );
 
-  // A busca olha no título, descrição e categoria da dica.
+  const categoriasDicas = useMemo(
+    () => [...new Set(dicas.map(({ categoria }) => categoria).filter(Boolean))]
+      .sort((categoriaA, categoriaB) => categoriaA.localeCompare(categoriaB, 'pt-BR')),
+    [dicas]
+  );
+
+  // Combina a busca textual com o filtro de categoria selecionado.
   const dicasFiltradas = useMemo(() => {
     const termoBuscaNormalizado = busca.trim().toLocaleLowerCase('pt-BR');
-    if (!termoBuscaNormalizado) return dicas;
-    return dicas.filter(({ titulo, descricao, categoria }) =>
-      `${titulo} ${descricao} ${categoria}`.toLocaleLowerCase('pt-BR').includes(termoBuscaNormalizado)
-    );
-  }, [busca, dicas]);
+    return dicas.filter(({ titulo, descricao, categoria }) => {
+      const correspondeCategoria = categoriaSelecionada === null || categoria === categoriaSelecionada;
+      const correspondeBusca = !termoBuscaNormalizado
+        || `${titulo} ${descricao} ${categoria}`.toLocaleLowerCase('pt-BR').includes(termoBuscaNormalizado);
+      return correspondeCategoria && correspondeBusca;
+    });
+  }, [busca, categoriaSelecionada, dicas]);
 
-  const buscaAtiva = busca.trim().length > 0;
+  const buscaAtiva = busca.trim().length > 0 || categoriaSelecionada !== null;
   const dicasVisiveis = buscaAtiva || mostrarTodas
     ? dicasFiltradas
     : dicasFiltradas.slice(0, 4);
   const { animacoes: animacoesDicas } = useAnimacaoCascata(dicasVisiveis.length, 0, 80);
   const { animacoes: animacoesVideos } = useAnimacaoCascata(videos.length, 0, 80);
+  const { animacoes: animacoesDestaque } = useAnimacaoCascata(1, 100, 80);
   const { estiloAnimado: estiloModalAnimado } = useAnimacaoModal(dicaAberta !== null);
 
   return (
@@ -201,7 +211,7 @@ const carregarVideos = useCallback(async () => {
 
       {/* Essa análise usa as transações e metas atuais do usuário. */}
       {/* Dica personalizada */}
-      <View style={styles.dicaDestaque}>
+      <Animated.View style={[styles.dicaDestaque, estiloEntradaCascata(animacoesDestaque[0])]}>
         <View style={styles.destaqueCabecalho}>
           <Text style={styles.dicaDestaqueLabel}>✨ Para você agora</Text>
           <TouchableOpacity
@@ -221,7 +231,7 @@ const carregarVideos = useCallback(async () => {
         ) : (
           <Text style={styles.dicaDestaqueTexto}>{erroAnalise ?? analise}</Text>
         )}
-      </View>
+      </Animated.View>
 
       <View style={styles.buscaContainer}>
         <Search size={20} color="#64748B" />
@@ -235,6 +245,32 @@ const carregarVideos = useCallback(async () => {
         />
       </View>
 
+      <View style={styles.filtroCategorias}>
+        <Text style={styles.filtroCategoriasLabel}>Categorias</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtroCategoriasLista}
+        >
+          {[null, ...categoriasDicas].map((categoria) => {
+            const selecionada = categoriaSelecionada === categoria;
+            return (
+              <TouchableOpacity
+                key={categoria ?? 'todas'}
+                style={[styles.filtroCategoriaChip, selecionada && styles.filtroCategoriaChipAtivo]}
+                onPress={() => setCategoriaSelecionada(categoria)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: selecionada }}
+              >
+                <Text style={[styles.filtroCategoriaTexto, selecionada && styles.filtroCategoriaTextoAtivo]}>
+                  {categoria ?? 'Todas'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {/* Lista de dicas (clicáveis) */}
       <Text style={styles.secaoTitulo}>Central de Aprendizado</Text>
       <Text style={styles.secaoSubtitulo}>Toque em um card para ver o conteúdo completo</Text>
@@ -246,10 +282,7 @@ const carregarVideos = useCallback(async () => {
         return (
           <Animated.View
             key={dicaAtual.id}
-            style={{
-              opacity: animacao,
-              transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-            }}
+            style={estiloEntradaCascata(animacao)}
           >
             <TouchableOpacity
               style={styles.dicaCard}
@@ -299,10 +332,7 @@ const carregarVideos = useCallback(async () => {
           return (
           <Animated.View
             key={videoAtual.id}
-            style={{
-              opacity: animacao,
-              transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-            }}
+            style={estiloEntradaCascata(animacao)}
           >
           <TouchableOpacity
             style={styles.videoCard}
@@ -431,6 +461,26 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   buscaInput: { flex: 1, paddingVertical: 13, paddingHorizontal: 10, color: '#1E293B' },
+  filtroCategorias: { marginBottom: 8 },
+  filtroCategoriasLabel: {
+    color: '#64748B',
+    fontSize: 12,
+    fontWeight: '600',
+    marginHorizontal: 16,
+    marginBottom: 8,
+  },
+  filtroCategoriasLista: { paddingHorizontal: 16, gap: 8 },
+  filtroCategoriaChip: {
+    backgroundColor: '#fff',
+    borderColor: '#E2E8F0',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  filtroCategoriaChipAtivo: { backgroundColor: '#1A9E75', borderColor: '#1A9E75' },
+  filtroCategoriaTexto: { color: '#64748B', fontSize: 12, fontWeight: '600' },
+  filtroCategoriaTextoAtivo: { color: '#fff' },
   semResultados: { color: '#64748B', textAlign: 'center', marginVertical: 20 },
   botaoVerMais: {
     alignSelf: 'center',

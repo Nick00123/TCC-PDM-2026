@@ -46,6 +46,14 @@ export function useAnimacaoCascata(
   return { fadeAnimTop, animacoes };
 }
 
+// Compartilha o movimento vertical usado na entrada em cascata dos cards.
+export function estiloEntradaCascata(animacao: Animated.Value) {
+  return {
+    opacity: animacao,
+    transform: [{ translateY: animacao.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+  };
+}
+
 // Reproduz a mesma entrada suave sempre que um modal fica visível.
 export function useAnimacaoModal(visivel: boolean) {
   const [animModal] = useState(() => new Animated.Value(0));

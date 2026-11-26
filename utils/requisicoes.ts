@@ -171,7 +171,7 @@ export async function atualizarProgressoDaMeta(usuarioId: string, metaId: string
 // Busca até 50 notificações do usuário e converte os registros para Notificacao.
 // Recebe o identificador do usuário e os cabeçalhos; retorna a lista encontrada.
 export async function buscarNotificacoes(usuarioId: string, cabecalhos: CabecalhosHttp): Promise<Notificacao[]> {
-  const urlConsulta = `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&order=criada_em.desc&limit=50`;
+  const urlConsulta = `notificacoes?select=*&usuario_id=eq.${encodeURIComponent(usuarioId)}&excluida=eq.false&order=criada_em.desc&limit=50`;
   const respostaDaApi = await validarRespostaDaApi(await executarRequisicaoRest(urlConsulta, { headers: cabecalhos }));
   const notificacoesRecebidas = await respostaDaApi.json();
 
@@ -196,12 +196,17 @@ export async function criarNotificacao(dadosDaNotificacao: object, cabecalhos: C
 }
 
 // Atualiza ou exclui notificações conforme o método HTTP informado.
-// Recebe o caminho, PATCH/DELETE e cabeçalhos; confirma o registro afetado.
-export async function alterarNotificacoes(urlConsulta: string, metodoHttp: 'PATCH' | 'DELETE', cabecalhos: CabecalhosHttp): Promise<void> {
+// Recebe o caminho, método, cabeçalhos e campos; confirma o registro afetado.
+export async function alterarNotificacoes(
+  urlConsulta: string,
+  metodoHttp: 'PATCH' | 'DELETE',
+  cabecalhos: CabecalhosHttp,
+  camposAtualizados: { lida?: boolean; excluida?: boolean } = { lida: true }
+): Promise<void> {
   await validarAlteracaoComRegistro(await executarRequisicaoRest(urlConsulta, {
     method: metodoHttp,
     headers: { ...cabecalhos, Prefer: 'return=representation' },
-    body: metodoHttp === 'PATCH' ? JSON.stringify({ lida: true }) : undefined,
+    body: metodoHttp === 'PATCH' ? JSON.stringify(camposAtualizados) : undefined,
   }));
 }
 
